@@ -1,23 +1,19 @@
-
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { Session, User as SupabaseUser } from "@supabase/supabase-js";
+import { Session } from "@supabase/supabase-js";
 import { AuthState, UserRole, User } from "@/types/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
-// Helper function to clean up auth state
+// Cleanup auth state
 const cleanupAuthState = () => {
-  // Remove standard auth tokens
-  localStorage.removeItem('supabase.auth.token');
-  // Remove all Supabase auth keys from localStorage
+  localStorage.removeItem("supabase.auth.token");
   Object.keys(localStorage).forEach((key) => {
-    if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
+    if (key.startsWith("supabase.auth.") || key.includes("sb-")) {
       localStorage.removeItem(key);
     }
   });
-  // Remove from sessionStorage if in use
   Object.keys(sessionStorage || {}).forEach((key) => {
-    if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
+    if (key.startsWith("supabase.auth.") || key.includes("sb-")) {
       sessionStorage.removeItem(key);
     }
   });
@@ -48,15 +44,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
   const [session, setSession] = useState<Session | null>(null);
 
-  // Helper function to fetch profile data
   const fetchProfileData = async (userId: string): Promise<User | null> => {
     try {
       const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
         .single();
-        
+
       if (error) {
         console.error("Error fetching profile:", error);
         return null;
@@ -66,9 +61,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return {
           id: data.id,
           email: data.email,
-          firstName: data.first_name || '',
-          lastName: data.last_name || '',
-          role: (data.role as UserRole) || 'employee',
+          firstName: data.first_name || "",
+          lastName: data.last_name || "",
+          role: (data.role as UserRole) || "employee",
           avatar: data.avatar_url,
         };
       }
@@ -79,7 +74,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Mock data for initial development
   const mockUsers: Record<string, User> = {
     "admin@example.com": {
       id: "1",
@@ -105,17 +99,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, currentSession) => {
-        console.log("Auth state changed:", event, currentSession?.user?.email);
         setSession(currentSession);
-        
         if (currentSession?.user) {
-          // Fetch profile data or use mock data
           try {
             const userData = await fetchProfileData(currentSession.user.id);
-            
             if (userData) {
               setState({
                 user: userData,
@@ -123,15 +112,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 isLoading: false,
               });
             } else {
-              // If profile data not found, use defaults from auth
               const defaultUser: User = {
                 id: currentSession.user.id,
                 email: currentSession.user.email,
-                firstName: currentSession.user.user_metadata?.first_name || '',
-                lastName: currentSession.user.user_metadata?.last_name || '',
-                role: currentSession.user.user_metadata?.role || 'employee',
+                firstName: currentSession.user.user_metadata?.first_name || "",
+                lastName: currentSession.user.user_metadata?.last_name || "",
+                role: currentSession.user.user_metadata?.role || "employee",
               };
-
               setState({
                 user: defaultUser,
                 isAuthenticated: true,
@@ -139,7 +126,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               });
             }
           } catch (error) {
-            console.error("Error processing auth state change:", error);
+            console.error("Auth change error:", error);
             setState({
               user: null,
               isAuthenticated: false,
@@ -147,24 +134,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             });
           }
         } else {
-          setState({
-            user: null,
-            isAuthenticated: false,
-            isLoading: false,
-          });
+          setState({ user: null, isAuthenticated: false, isLoading: false });
         }
       }
     );
 
-    // THEN check for existing session
     supabase.auth.getSession().then(async ({ data: { session: currentSession } }) => {
-      console.log("Initial session check:", currentSession?.user?.email);
       setSession(currentSession);
-      
       if (currentSession?.user) {
         try {
           const userData = await fetchProfileData(currentSession.user.id);
-          
           if (userData) {
             setState({
               user: userData,
@@ -172,15 +151,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               isLoading: false,
             });
           } else {
-            // If profile data not found, use defaults from auth
             const defaultUser: User = {
               id: currentSession.user.id,
               email: currentSession.user.email,
-              firstName: currentSession.user.user_metadata?.first_name || '',
-              lastName: currentSession.user.user_metadata?.last_name || '',
-              role: currentSession.user.user_metadata?.role || 'employee',
+              firstName: currentSession.user.user_metadata?.first_name || "",
+              lastName: currentSession.user.user_metadata?.last_name || "",
+              role: currentSession.user.user_metadata?.role || "employee",
             };
-
             setState({
               user: defaultUser,
               isAuthenticated: true,
@@ -188,7 +165,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             });
           }
         } catch (error) {
-          console.error("Error processing initial session:", error);
+          console.error("Session error:", error);
           setState({
             user: null,
             isAuthenticated: false,
@@ -196,11 +173,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           });
         }
       } else {
-        setState({ 
-          user: null, 
-          isAuthenticated: false, 
-          isLoading: false 
-        });
+        setState({ user: null, isAuthenticated: false, isLoading: false });
       }
     });
 
@@ -211,30 +184,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (email: string, password: string) => {
     setState((prev) => ({ ...prev, isLoading: true }));
-    
     try {
-      // Clean up existing state
       cleanupAuthState();
-      
-      // Try to sign out first to ensure clean state
-      try {
-        await supabase.auth.signOut({ scope: 'global' });
-      } catch (err) {
-        // Continue even if this fails
-      }
-      
-      // Sign in with Supabase
+      await supabase.auth.signOut({ scope: "global" }).catch(() => {});
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
-      
       if (error) throw error;
-      
+
       if (data.user) {
         try {
           const userData = await fetchProfileData(data.user.id);
-          
           if (userData) {
             setState({
               user: userData,
@@ -242,42 +203,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               isLoading: false,
             });
           } else {
-            // If profile data not found, use defaults from auth
             const defaultUser: User = {
               id: data.user.id,
               email: data.user.email,
-              firstName: data.user.user_metadata?.first_name || '',
-              lastName: data.user.user_metadata?.last_name || '',
-              role: data.user.user_metadata?.role || 'employee',
+              firstName: data.user.user_metadata?.first_name || "",
+              lastName: data.user.user_metadata?.last_name || "",
+              role: data.user.user_metadata?.role || "employee",
             };
-
             setState({
               user: defaultUser,
               isAuthenticated: true,
               isLoading: false,
             });
           }
+          setSession(data.session);
+          return;
         } catch (err) {
-          console.error("Error fetching profile after login:", err);
-          // Still mark as authenticated since Supabase auth succeeded
+          console.error("Login fetch error:", err);
           setState({
             user: {
               id: data.user.id,
               email: data.user.email,
-              firstName: '',
-              lastName: '',
-              role: 'employee',
+              firstName: "",
+              lastName: "",
+              role: "employee",
             },
             isAuthenticated: true,
             isLoading: false,
           });
         }
-        
-        setSession(data.session);
-        return;
       }
-      
-      // Fallback to mock data (for development)
+
       if (mockUsers[email.toLowerCase()] && password === "password") {
         const mockUser = mockUsers[email.toLowerCase()];
         setState({
@@ -287,7 +243,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
         return;
       }
-      
+
       throw new Error("Invalid email or password");
     } catch (error: any) {
       console.error("Login error:", error);
@@ -302,23 +258,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     setState((prev) => ({ ...prev, isLoading: true }));
-    
     try {
-      // Clean up auth state
       cleanupAuthState();
-      
-      // Sign out from Supabase
-      await supabase.auth.signOut({ scope: 'global' });
-      
-      setState({
-        user: null,
-        isAuthenticated: false,
-        isLoading: false,
-      });
+      await supabase.auth.signOut({ scope: "global" });
+      setState({ user: null, isAuthenticated: false, isLoading: false });
       setSession(null);
-      
-      // Force page reload for a clean state
-      window.location.href = '/login';
+      window.location.href = "/login";
     } catch (error: any) {
       console.error("Logout error:", error);
       toast({
