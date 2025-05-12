@@ -1,168 +1,96 @@
 
 import React from "react";
-import { NavLink } from "react-router-dom";
-import {
-  Calendar,
-  ClipboardList,
+import { NavLink, useLocation } from "react-router-dom";
+import { useSidebar, Sidebar, SidebarContent, SidebarTrigger } from "@/components/ui/sidebar";
+import { 
+  BarChart3,
+  ClipboardCheck,
   FileText,
   Home,
-  LogOut,
   Settings,
-  Users,
+  Users 
 } from "lucide-react";
-
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarTrigger,
-  useSidebar,
-} from "@/components/ui/sidebar";
 import { useAuth } from "@/context/AuthContext";
 
 export function AppSidebar() {
-  const { collapsed } = useSidebar();
-  const { user, logout } = useAuth();
+  const sidebar = useSidebar();
+  const { user } = useAuth();
+  const location = useLocation();
   
-  if (!user) return null;
+  const isActive = (path: string) => location.pathname === path;
   
-  return (
-    <Sidebar
-      className={collapsed ? "w-14" : "w-60"}
-      collapsible
-    >
-      <SidebarTrigger className="m-2 self-end text-white" />
+  const navItems = [
+    { 
+      label: "Dashboard", 
+      icon: <Home className="h-5 w-5" />,
+      href: "/dashboard" 
+    },
+    { 
+      label: "Employees", 
+      icon: <Users className="h-5 w-5" />, 
+      href: "/employees" 
+    },
+    { 
+      label: "Timesheets", 
+      icon: <FileText className="h-5 w-5" />, 
+      href: "/timesheets"
+    },
+    { 
+      label: "Approvals", 
+      icon: <ClipboardCheck className="h-5 w-5" />, 
+      href: "/approvals"
+    },
+    { 
+      label: "Reports", 
+      icon: <BarChart3 className="h-5 w-5" />, 
+      href: "/reports"
+    },
+    { 
+      label: "Settings", 
+      icon: <Settings className="h-5 w-5" />, 
+      href: "/settings"
+    },
+  ];
 
-      <SidebarContent>
-        <div className="py-4 flex flex-col items-center">
-          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-white text-primary font-bold text-xl">
-            {user.firstName[0]}
-          </div>
-          {!collapsed && (
-            <div className="mt-2 text-center text-white">
-              <div className="font-medium">{user.firstName} {user.lastName}</div>
-              <div className="text-xs text-white/70 capitalize">{user.role}</div>
-            </div>
+  return (
+    <Sidebar className={sidebar.collapsed ? "w-16" : "w-64"} collapsible>
+      <div className="flex h-14 items-center px-4 border-b">
+        <div className="flex items-center gap-2">
+          {!sidebar.collapsed && (
+            <span className="text-xl font-bold">TimeTrack</span>
           )}
         </div>
-
-        <SidebarGroup>
-          <SidebarGroupLabel className="text-white/70">
-            {!collapsed && "Navigation"}
-          </SidebarGroupLabel>
-
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <NavLink 
-                    to="/dashboard" 
-                    className={({ isActive }) => 
-                      `nav-link ${isActive ? 'nav-link-active' : 'nav-link-inactive'}`
-                    }
-                  >
-                    <Home className="h-5 w-5" />
-                    {!collapsed && <span>Dashboard</span>}
-                  </NavLink>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <NavLink 
-                    to="/employees" 
-                    className={({ isActive }) => 
-                      `nav-link ${isActive ? 'nav-link-active' : 'nav-link-inactive'}`
-                    }
-                  >
-                    <Users className="h-5 w-5" />
-                    {!collapsed && <span>Employees</span>}
-                  </NavLink>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <NavLink 
-                    to="/timesheets" 
-                    className={({ isActive }) => 
-                      `nav-link ${isActive ? 'nav-link-active' : 'nav-link-inactive'}`
-                    }
-                  >
-                    <Calendar className="h-5 w-5" />
-                    {!collapsed && <span>Timesheets</span>}
-                  </NavLink>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <NavLink 
-                    to="/approvals" 
-                    className={({ isActive }) => 
-                      `nav-link ${isActive ? 'nav-link-active' : 'nav-link-inactive'}`
-                    }
-                  >
-                    <ClipboardList className="h-5 w-5" />
-                    {!collapsed && <span>Approvals</span>}
-                  </NavLink>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <NavLink 
-                    to="/reports" 
-                    className={({ isActive }) => 
-                      `nav-link ${isActive ? 'nav-link-active' : 'nav-link-inactive'}`
-                    }
-                  >
-                    <FileText className="h-5 w-5" />
-                    {!collapsed && <span>Reports</span>}
-                  </NavLink>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        <SidebarGroup className="mt-auto">
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <NavLink 
-                    to="/settings" 
-                    className={({ isActive }) => 
-                      `nav-link ${isActive ? 'nav-link-active' : 'nav-link-inactive'}`
-                    }
-                  >
-                    <Settings className="h-5 w-5" />
-                    {!collapsed && <span>Settings</span>}
-                  </NavLink>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild>
-                  <button 
-                    onClick={() => logout()}
-                    className="nav-link nav-link-inactive w-full text-left"
-                  >
-                    <LogOut className="h-5 w-5" />
-                    {!collapsed && <span>Logout</span>}
-                  </button>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+      </div>
+      
+      <SidebarContent className="p-2">
+        <nav className="flex flex-col gap-1">
+          {navItems.map((item) => (
+            <NavLink
+              key={item.href}
+              to={item.href}
+              className={({ isActive }) => `
+                flex items-center gap-3 px-3 py-2 rounded-md transition-colors
+                ${isActive ? "bg-primary/10 text-primary" : "hover:bg-muted"}
+              `}
+            >
+              {item.icon}
+              {!sidebar.collapsed && <span>{item.label}</span>}
+            </NavLink>
+          ))}
+        </nav>
       </SidebarContent>
+      
+      <div className="mt-auto p-4 border-t">
+        <SidebarTrigger className="w-full flex justify-center">
+          <div className="p-2 rounded-md hover:bg-muted">
+            {sidebar.collapsed ? (
+              <div className="w-5 h-5 border-t-2 border-l-2 rotate-135 transform transition-transform" />
+            ) : (
+              <div className="w-5 h-5 border-t-2 border-l-2 -rotate-45 transform transition-transform" />
+            )}
+          </div>
+        </SidebarTrigger>
+      </div>
     </Sidebar>
   );
 }

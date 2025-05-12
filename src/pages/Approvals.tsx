@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,89 +18,236 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Check, Filter, Search, X } from "lucide-react";
-
-// Mock approval data
-const pendingApprovals = [
-  {
-    id: "1",
-    employeeName: "John Smith",
-    month: "April 2023",
-    submittedDate: "2023-05-01",
-    totalHours: 168,
-    status: "pending",
-  },
-  {
-    id: "2",
-    employeeName: "Sarah Johnson",
-    month: "April 2023",
-    submittedDate: "2023-04-30",
-    totalHours: 160,
-    status: "pending",
-  },
-  {
-    id: "3",
-    employeeName: "Michael Brown",
-    month: "April 2023",
-    submittedDate: "2023-05-02",
-    totalHours: 120,
-    status: "pending",
-  },
-];
-
-const historyApprovals = [
-  {
-    id: "4",
-    employeeName: "Emily Davis",
-    month: "March 2023",
-    submittedDate: "2023-04-01",
-    reviewedDate: "2023-04-03",
-    totalHours: 176,
-    status: "approved",
-  },
-  {
-    id: "5",
-    employeeName: "Robert Wilson",
-    month: "March 2023",
-    submittedDate: "2023-03-31",
-    reviewedDate: "2023-04-02",
-    totalHours: 168,
-    status: "approved",
-  },
-  {
-    id: "6",
-    employeeName: "Jennifer Lee",
-    month: "March 2023",
-    submittedDate: "2023-04-01",
-    reviewedDate: "2023-04-04",
-    totalHours: 152,
-    status: "rejected",
-    comments: "Hours don't match with project allocation. Please review and resubmit.",
-  },
-];
+import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const Approvals = () => {
-  const [selectedTimesheet, setSelectedTimesheet] = React.useState<any>(null);
-  const [comment, setComment] = React.useState("");
+  const [pendingApprovals, setPendingApprovals] = useState([]);
+  const [historyApprovals, setHistoryApprovals] = useState([]);
+  const [selectedTimesheet, setSelectedTimesheet] = useState(null);
+  const [comment, setComment] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleReview = (timesheet: any) => {
+  // Fetch timesheet data from Supabase
+  useEffect(() => {
+    fetchTimesheets();
+  }, []);
+
+  const fetchTimesheets = async () => {
+    setIsLoading(true);
+    try {
+      // Fetch pending timesheets
+      const { data: pendingData, error: pendingError } = await supabase
+        .from('timesheets')
+        .select(`
+          *,
+          users:user_id (
+            email
+          )
+        `)
+        .eq('status', 'Pending');
+
+      if (pendingError) throw pendingError;
+
+      // Fetch approved/rejected timesheets
+      const { data: historyData, error: historyError } = await supabase
+        .from('timesheets')
+        .select(`
+          *,
+          users:user_id (
+            email
+          )
+        `)
+        .in('status', ['Approved', 'Rejected']);
+
+      if (historyError) throw historyError;
+
+      // Group timesheets by user and month
+      const pending = groupTimesheetsByUserAndMonth(pendingData);
+      const history = groupTimesheetsByUserAndMonth(historyData);
+
+      setPendingApprovals(pending);
+      setHistoryApprovals(history);
+    } catch (error) {
+      console.error('Error fetching timesheets:', error);
+      toast({
+        title: "Failed to fetch data",
+        description: "Could not load timesheet approval data. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Helper function to group timesheet entries by user and month
+  const groupTimesheetsByUserAndMonth = (data) => {
+    const grouped = {};
+    
+    if (!data || data.length === 0) return [];
+    
+    data.forEach(entry => {
+      const userId = entry.user_id;
+      const date = new Date(entry.date);
+      const month = date.getMonth();
+      const year = date.getFullYear();
+      const key = `${userId}_${year}_${month}`;
+      
+      if (!grouped[key]) {
+        grouped[key] = {
+          id: key,
+          userId: userId,
+          employeeName: entry.users?.email?.split('@')[0] || 'Unknown',
+          email: entry.users?.email || 'unknown@example.com',
+          month: format(date, 'MMMM yyyy'),
+          submittedDate: entry.created_at,
+          reviewedDate: entry.status !== 'Pending' ? entry.updated_at : null,
+          status: entry.status,
+          entries: [],
+          totalHours: 0,
+          comments: entry.description || ''
+        };
+      }
+      
+      grouped[key].entries.push(entry);
+      grouped[key].totalHours += parseFloat(entry.hours_worked);
+    });
+    
+    return Object.values(grouped);
+  };
+
+  const handleReview = (timesheet) => {
     setSelectedTimesheet(timesheet);
     setComment("");
   };
 
-  const handleApprove = () => {
-    // In a real app, make API call to approve timesheet
-    setSelectedTimesheet(null);
+  const handleApprove = async () => {
+    if (!selectedTimesheet) return;
+    
+    setIsSubmitting(true);
+    
+    try {
+      // Update all timesheet entries for this user and month to approved
+      const userId = selectedTimesheet.userId;
+      const [, year, month] = selectedTimesheet.id.split('_');
+      
+      // Calculate the first and last day of the month
+      const firstDay = new Date(year, month, 1);
+      const lastDay = new Date(year, parseInt(month) + 1, 0);
+      
+      const firstDayStr = format(firstDay, 'yyyy-MM-dd');
+      const lastDayStr = format(lastDay, 'yyyy-MM-dd');
+      
+      const { error } = await supabase
+        .from('timesheets')
+        .update({
+          status: 'Approved',
+          description: comment.length > 0 ? comment : null
+        })
+        .eq('user_id', userId)
+        .gte('date', firstDayStr)
+        .lte('date', lastDayStr);
+        
+      if (error) throw error;
+      
+      toast({
+        title: "Timesheet approved",
+        description: `You have approved the timesheet for ${selectedTimesheet.employeeName}`
+      });
+      
+      // Refresh the data
+      fetchTimesheets();
+      
+      // Close the dialog
+      setSelectedTimesheet(null);
+    } catch (error) {
+      console.error('Error approving timesheet:', error);
+      toast({
+        title: "Approval failed",
+        description: "Could not approve the timesheet. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleReject = () => {
-    // In a real app, make API call to reject timesheet
-    setSelectedTimesheet(null);
+  const handleReject = async () => {
+    if (!selectedTimesheet || !comment) {
+      toast({
+        title: "Comment required",
+        description: "Please provide a reason for rejection",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setIsSubmitting(true);
+    
+    try {
+      // Update all timesheet entries for this user and month to rejected
+      const userId = selectedTimesheet.userId;
+      const [, year, month] = selectedTimesheet.id.split('_');
+      
+      // Calculate the first and last day of the month
+      const firstDay = new Date(year, month, 1);
+      const lastDay = new Date(year, parseInt(month) + 1, 0);
+      
+      const firstDayStr = format(firstDay, 'yyyy-MM-dd');
+      const lastDayStr = format(lastDay, 'yyyy-MM-dd');
+      
+      const { error } = await supabase
+        .from('timesheets')
+        .update({
+          status: 'Rejected',
+          description: comment
+        })
+        .eq('user_id', userId)
+        .gte('date', firstDayStr)
+        .lte('date', lastDayStr);
+        
+      if (error) throw error;
+      
+      toast({
+        title: "Timesheet rejected",
+        description: `You have rejected the timesheet for ${selectedTimesheet.employeeName}`
+      });
+      
+      // Refresh the data
+      fetchTimesheets();
+      
+      // Close the dialog
+      setSelectedTimesheet(null);
+    } catch (error) {
+      console.error('Error rejecting timesheet:', error);
+      toast({
+        title: "Rejection failed",
+        description: "Could not reject the timesheet. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
+
+  const filteredPendingApprovals = pendingApprovals.filter(timesheet => 
+    timesheet.employeeName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    timesheet.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    timesheet.month.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const filteredHistoryApprovals = historyApprovals.filter(timesheet => 
+    timesheet.employeeName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    timesheet.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    timesheet.month.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    timesheet.status.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <div className="space-y-6">
@@ -116,7 +263,12 @@ const Approvals = () => {
             <Filter className="mr-2 h-4 w-4" />
             Filter
           </Button>
-          <Button>
+          <Button onClick={() => {
+            toast({
+              title: "Coming soon",
+              description: "Bulk approval functionality is coming soon."
+            });
+          }}>
             Approve All
           </Button>
         </div>
@@ -128,6 +280,8 @@ const Approvals = () => {
           <Input
             placeholder="Search submissions..."
             className="pl-8"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
       </div>
@@ -137,7 +291,7 @@ const Approvals = () => {
           <TabsTrigger value="pending">
             Pending 
             <span className="ml-2 bg-primary/10 text-primary font-medium rounded-full px-2 py-0.5 text-xs">
-              {pendingApprovals.length}
+              {filteredPendingApprovals.length}
             </span>
           </TabsTrigger>
           <TabsTrigger value="history">History</TabsTrigger>
@@ -157,28 +311,45 @@ const Approvals = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {pendingApprovals.map((timesheet) => (
-                  <TableRow key={timesheet.id}>
-                    <TableCell className="font-medium">{timesheet.employeeName}</TableCell>
-                    <TableCell>{timesheet.month}</TableCell>
-                    <TableCell>{format(new Date(timesheet.submittedDate), "MMM d, yyyy")}</TableCell>
-                    <TableCell>{timesheet.totalHours}</TableCell>
-                    <TableCell>
-                      <span className="status-pending">Pending</span>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="outline" size="sm" onClick={() => handleReview(timesheet)}>
-                        Review
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {pendingApprovals.length === 0 && (
+                {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-6 text-muted-foreground">
-                      No pending timesheet approvals
+                    <TableCell colSpan={6} className="text-center py-6">
+                      <div className="flex items-center justify-center">
+                        <div className="animate-spin w-6 h-6 border-4 border-primary border-t-transparent rounded-full"></div>
+                      </div>
                     </TableCell>
                   </TableRow>
+                ) : (
+                  <>
+                    {filteredPendingApprovals.map((timesheet) => (
+                      <TableRow key={timesheet.id}>
+                        <TableCell className="font-medium">
+                          {timesheet.employeeName}
+                          <div className="text-xs text-muted-foreground">{timesheet.email}</div>
+                        </TableCell>
+                        <TableCell>{timesheet.month}</TableCell>
+                        <TableCell>{timesheet.submittedDate ? format(new Date(timesheet.submittedDate), "MMM d, yyyy") : "N/A"}</TableCell>
+                        <TableCell>{timesheet.totalHours.toFixed(1)}</TableCell>
+                        <TableCell>
+                          <span className="inline-block px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                            Pending
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="outline" size="sm" onClick={() => handleReview(timesheet)}>
+                            Review
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {filteredPendingApprovals.length === 0 && !isLoading && (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-6 text-muted-foreground">
+                          No pending timesheet approvals
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </>
                 )}
               </TableBody>
             </Table>
@@ -200,33 +371,47 @@ const Approvals = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {historyApprovals.map((timesheet) => (
-                  <TableRow key={timesheet.id}>
-                    <TableCell className="font-medium">{timesheet.employeeName}</TableCell>
-                    <TableCell>{timesheet.month}</TableCell>
-                    <TableCell>{format(new Date(timesheet.submittedDate), "MMM d, yyyy")}</TableCell>
-                    <TableCell>{format(new Date(timesheet.reviewedDate), "MMM d, yyyy")}</TableCell>
-                    <TableCell>{timesheet.totalHours}</TableCell>
-                    <TableCell>
-                      <span className={
-                        timesheet.status === "approved" ? "status-approved" : "status-rejected"
-                      }>
-                        {timesheet.status === "approved" ? "Approved" : "Rejected"}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="sm" onClick={() => handleReview(timesheet)}>
-                        View
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {historyApprovals.length === 0 && (
+                {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-6 text-muted-foreground">
-                      No timesheet approval history
+                    <TableCell colSpan={7} className="text-center py-6">
+                      <div className="flex items-center justify-center">
+                        <div className="animate-spin w-6 h-6 border-4 border-primary border-t-transparent rounded-full"></div>
+                      </div>
                     </TableCell>
                   </TableRow>
+                ) : (
+                  <>
+                    {filteredHistoryApprovals.map((timesheet) => (
+                      <TableRow key={timesheet.id}>
+                        <TableCell className="font-medium">
+                          {timesheet.employeeName}
+                          <div className="text-xs text-muted-foreground">{timesheet.email}</div>
+                        </TableCell>
+                        <TableCell>{timesheet.month}</TableCell>
+                        <TableCell>{timesheet.submittedDate ? format(new Date(timesheet.submittedDate), "MMM d, yyyy") : "N/A"}</TableCell>
+                        <TableCell>{timesheet.reviewedDate ? format(new Date(timesheet.reviewedDate), "MMM d, yyyy") : "N/A"}</TableCell>
+                        <TableCell>{timesheet.totalHours.toFixed(1)}</TableCell>
+                        <TableCell>
+                          <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium
+                            ${timesheet.status === "Approved" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
+                            {timesheet.status}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="ghost" size="sm" onClick={() => handleReview(timesheet)}>
+                            View
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {filteredHistoryApprovals.length === 0 && !isLoading && (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-6 text-muted-foreground">
+                          No timesheet approval history
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </>
                 )}
               </TableBody>
             </Table>
@@ -249,6 +434,7 @@ const Approvals = () => {
               <div>
                 <p className="text-sm text-muted-foreground">Employee</p>
                 <p className="font-medium">{selectedTimesheet?.employeeName}</p>
+                <p className="text-sm text-muted-foreground">{selectedTimesheet?.email}</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Month</p>
@@ -262,20 +448,41 @@ const Approvals = () => {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Total Hours</p>
-                <p className="font-medium">{selectedTimesheet?.totalHours}</p>
+                <p className="font-medium">{selectedTimesheet?.totalHours.toFixed(1)}</p>
               </div>
             </div>
 
             <div className="border rounded-md p-4 bg-gray-50">
               <p className="text-sm font-medium mb-2">Timesheet Summary</p>
-              <p className="text-sm text-muted-foreground mb-2">
-                Mock summary data would be displayed here in a real implementation.
-              </p>
+              
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Hours</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Description</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {selectedTimesheet?.entries?.map((entry) => (
+                    <TableRow key={entry.id}>
+                      <TableCell>{format(new Date(entry.date), "MMM d, yyyy")}</TableCell>
+                      <TableCell>{entry.hours_worked}</TableCell>
+                      <TableCell>{entry.hours_worked === 0 ? "Leave" : "Work"}</TableCell>
+                      <TableCell>{entry.description || "-"}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
               
               <div className="mt-4 space-y-2">
-                <p className="text-sm font-medium">Work Days: 21</p>
-                <p className="text-sm font-medium">Leave Days: 1</p>
-                <p className="text-sm font-medium">Holiday/Weekend Days: 8</p>
+                <p className="text-sm font-medium">
+                  Work Days: {selectedTimesheet?.entries?.filter(e => e.hours_worked > 0).length || 0}
+                </p>
+                <p className="text-sm font-medium">
+                  Leave Days: {selectedTimesheet?.entries?.filter(e => e.hours_worked === 0).length || 0}
+                </p>
               </div>
             </div>
 
@@ -287,22 +494,27 @@ const Approvals = () => {
                 onChange={(e) => setComment(e.target.value)}
                 rows={3}
               />
+              {selectedTimesheet?.status === "Rejected" && selectedTimesheet?.comments && (
+                <div className="text-sm text-red-500 italic mt-2">
+                  Previous rejection reason: {selectedTimesheet.comments}
+                </div>
+              )}
             </div>
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setSelectedTimesheet(null)}>
-              Cancel
+            <Button variant="outline" onClick={() => setSelectedTimesheet(null)} disabled={isSubmitting}>
+              Close
             </Button>
-            {selectedTimesheet?.status !== "approved" && selectedTimesheet?.status !== "rejected" && (
+            {selectedTimesheet?.status !== "Approved" && selectedTimesheet?.status !== "Rejected" && (
               <>
-                <Button variant="destructive" onClick={handleReject}>
+                <Button variant="destructive" onClick={handleReject} disabled={isSubmitting}>
                   <X className="mr-2 h-4 w-4" />
-                  Reject
+                  {isSubmitting ? "Rejecting..." : "Reject"}
                 </Button>
-                <Button onClick={handleApprove}>
+                <Button onClick={handleApprove} disabled={isSubmitting}>
                   <Check className="mr-2 h-4 w-4" />
-                  Approve
+                  {isSubmitting ? "Approving..." : "Approve"}
                 </Button>
               </>
             )}

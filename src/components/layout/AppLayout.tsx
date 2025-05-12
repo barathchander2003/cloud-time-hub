@@ -1,7 +1,7 @@
 
 import React from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
-import { SidebarProvider } from "@/components/ui/sidebar";
+import { Sidebar, SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
 import { AppHeader } from "./AppHeader";
 import { useAuth } from "@/context/AuthContext";
@@ -25,7 +25,7 @@ export function AppLayout() {
   }
   
   return (
-    <SidebarProvider collapsedWidth={56} defaultCollapsed={false}>
+    <SidebarProvider defaultCollapsed={false}>
       <div className="min-h-screen flex w-full">
         <AppSidebar />
         <div className="flex flex-col flex-1 overflow-x-hidden">
