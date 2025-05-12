@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -27,13 +26,19 @@ const timeData = [
 ];
 
 const Dashboard = () => {
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
+
+  // If loading, show a loading spinner or message
+  if (isLoading) return <div>Loading...</div>;
+
+  // If no user, show an error or redirect to login
+  if (!user) return <div>You must be logged in to access the dashboard.</div>;
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Welcome back, {user?.firstName}</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Welcome back, {user.firstName}</h1>
           <p className="text-muted-foreground">
             Here's an overview of your timesheet management system
           </p>
@@ -48,6 +53,7 @@ const Dashboard = () => {
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Cards */}
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -182,57 +188,7 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div className="flex justify-between items-center border-b pb-2">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
-                      <Users className="h-4 w-4" />
-                    </div>
-                    <div>
-                      <p className="font-medium">John Smith</p>
-                      <p className="text-sm text-muted-foreground">Submitted timesheet for June 2023</p>
-                    </div>
-                  </div>
-                  <p className="text-sm text-muted-foreground">2 hours ago</p>
-                </div>
-                
-                <div className="flex justify-between items-center border-b pb-2">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
-                      <Users className="h-4 w-4" />
-                    </div>
-                    <div>
-                      <p className="font-medium">Sarah Johnson</p>
-                      <p className="text-sm text-muted-foreground">Timesheet approved by Manager</p>
-                    </div>
-                  </div>
-                  <p className="text-sm text-muted-foreground">5 hours ago</p>
-                </div>
-                
-                <div className="flex justify-between items-center border-b pb-2">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
-                      <Users className="h-4 w-4" />
-                    </div>
-                    <div>
-                      <p className="font-medium">Michael Brown</p>
-                      <p className="text-sm text-muted-foreground">Added new document: "Contract Renewal"</p>
-                    </div>
-                  </div>
-                  <p className="text-sm text-muted-foreground">Yesterday</p>
-                </div>
-                
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
-                      <Users className="h-4 w-4" />
-                    </div>
-                    <div>
-                      <p className="font-medium">Emily Davis</p>
-                      <p className="text-sm text-muted-foreground">Updated employee profile</p>
-                    </div>
-                  </div>
-                  <p className="text-sm text-muted-foreground">Yesterday</p>
-                </div>
+                {/* Recent activities */}
               </div>
             </CardContent>
           </Card>
