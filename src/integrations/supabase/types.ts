@@ -33,6 +33,84 @@ export type Database = {
         }
         Relationships: []
       }
+      leave_requests: {
+        Row: {
+          created_at: string
+          document_url: string | null
+          end_date: string
+          id: string
+          reason: string | null
+          reviewed_at: string | null
+          reviewer_id: string | null
+          start_date: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          document_url?: string | null
+          end_date: string
+          id?: string
+          reason?: string | null
+          reviewed_at?: string | null
+          reviewer_id?: string | null
+          start_date: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          document_url?: string | null
+          end_date?: string
+          id?: string
+          reason?: string | null
+          reviewed_at?: string | null
+          reviewer_id?: string | null
+          start_date?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          department: string | null
+          first_name: string | null
+          id: string
+          last_name: string | null
+          position: string | null
+          role: string
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          department?: string | null
+          first_name?: string | null
+          id: string
+          last_name?: string | null
+          position?: string | null
+          role?: string
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          department?: string | null
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          position?: string | null
+          role?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       timesheets: {
         Row: {
           created_at: string | null

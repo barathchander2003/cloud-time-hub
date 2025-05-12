@@ -11,7 +11,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import MonthlyCalendar from "@/components/timesheets/MonthlyCalendar";
-import LeaveRequest from "@/components/timesheets/LeaveRequest";
+import { LeaveRequest } from "@/components/timesheets/LeaveRequest";
 import { ChevronLeft, ChevronRight, Download, Save, Send } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";

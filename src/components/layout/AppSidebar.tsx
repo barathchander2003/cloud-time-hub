@@ -13,9 +13,11 @@ import {
 import { useAuth } from "@/context/AuthContext";
 
 export function AppSidebar() {
-  const { isCollapsed, setCollapsed } = useSidebar();
+  const { state: sidebarState, toggleSidebar } = useSidebar();
   const { user } = useAuth();
   const location = useLocation();
+  
+  const isCollapsed = sidebarState === "collapsed";
   
   const isActive = (path: string) => location.pathname === path;
   
@@ -82,7 +84,7 @@ export function AppSidebar() {
       
       <div className="mt-auto p-4 border-t">
         <SidebarTrigger asChild>
-          <div className="p-2 rounded-md hover:bg-muted flex justify-center cursor-pointer" onClick={() => setCollapsed(!isCollapsed)}>
+          <div className="p-2 rounded-md hover:bg-muted flex justify-center cursor-pointer" onClick={toggleSidebar}>
             <div className={`w-5 h-5 border-t-2 border-l-2 transform transition-transform ${isCollapsed ? "rotate-135" : "-rotate-45"}`} />
           </div>
         </SidebarTrigger>

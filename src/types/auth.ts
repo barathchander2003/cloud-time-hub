@@ -1,9 +1,9 @@
 
-export type UserRole = "admin" | "hr" | "manager";
+export type UserRole = "admin" | "hr" | "manager" | "employee";
 
 export interface User {
   id: string;
-  email: string;
+  email: string | undefined;
   firstName: string;
   lastName: string;
   role: UserRole;

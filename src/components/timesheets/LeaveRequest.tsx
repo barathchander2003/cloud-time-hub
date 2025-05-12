@@ -44,7 +44,7 @@ const formSchema = z.object({
 
 type LeaveFormValues = z.infer<typeof formSchema>;
 
-export function LeaveRequest() {
+export function LeaveRequest({ onRequestSubmitted }: { onRequestSubmitted?: () => void }) {
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const { user } = useAuth();
@@ -79,7 +79,7 @@ export function LeaveRequest() {
     setIsUploading(true);
     
     try {
-      let attachmentPath = null;
+      let documentUrl = null;
       
       // Upload attachment if provided
       if (file) {
@@ -92,7 +92,13 @@ export function LeaveRequest() {
           .upload(filePath, file);
           
         if (uploadError) throw uploadError;
-        attachmentPath = filePath;
+        
+        // Get the public URL
+        const { data: urlData } = supabase.storage
+          .from('documents')
+          .getPublicUrl(filePath);
+          
+        documentUrl = urlData.publicUrl;
       }
       
       // Insert leave request record
@@ -102,9 +108,8 @@ export function LeaveRequest() {
           user_id: user.id,
           start_date: data.startDate.toISOString(),
           end_date: data.endDate.toISOString(),
-          leave_type: data.leaveType,
           reason: data.reason,
-          attachment_path: attachmentPath,
+          document_url: documentUrl,
           status: 'pending',
         });
         
@@ -118,6 +123,11 @@ export function LeaveRequest() {
       // Reset form
       form.reset();
       setFile(null);
+      
+      // Notify parent component
+      if (onRequestSubmitted) {
+        onRequestSubmitted();
+      }
       
     } catch (error: any) {
       console.error("Error submitting leave request:", error);
