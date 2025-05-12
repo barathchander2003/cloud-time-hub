@@ -1,67 +1,61 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 220 33% 98%;
+    --foreground: 224 71.4% 4.1%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 224 71.4% 4.1%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 224 71.4% 4.1%;
 
-    --primary: 222.2 47.4% 11.2%;
+    --primary: 221 83% 53%;
     --primary-foreground: 210 40% 98%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 220 14.3% 95.9%;
+    --secondary-foreground: 220.9 39.3% 11%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 220 14.3% 95.9%;
+    --muted-foreground: 220 8.9% 46.1%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 220 14.3% 95.9%;
+    --accent-foreground: 220.9 39.3% 11%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 224 71.4% 4.1%;
 
     --radius: 0.5rem;
 
-    --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
+    --sidebar-background: 221 83% 53%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 210 40% 98%;
+    --sidebar-primary-foreground: 221 83% 53%;
+    --sidebar-accent: 217.2 32.6% 17.5%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 224 71.4% 4.1%;
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
+    --background: 224 71.4% 4.1%;
     --foreground: 210 40% 98%;
 
-    --card: 222.2 84% 4.9%;
+    --card: 224 71.4% 4.1%;
     --card-foreground: 210 40% 98%;
 
-    --popover: 222.2 84% 4.9%;
+    --popover: 224 71.4% 4.1%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 210 40% 98%;
+    --primary: 217.2 91.2% 59.8%;
     --primary-foreground: 222.2 47.4% 11.2%;
 
     --secondary: 217.2 32.6% 17.5%;
@@ -79,13 +73,14 @@
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
+    
+    --sidebar-background: 217.2 32.6% 17.5%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 217.2 91.2% 59.8%;
+    --sidebar-primary-foreground: 222.2 47.4% 11.2%;
+    --sidebar-accent: 217.2 91.2% 59.8%;
+    --sidebar-accent-foreground: 222.2 47.4% 11.2%;
+    --sidebar-border: 217.2 32.6% 17.5%;
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
 }
@@ -98,4 +93,77 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+.nav-link {
+  @apply flex items-center gap-2 px-3 py-2 rounded-md transition-colors;
+}
+
+.nav-link-active {
+  @apply bg-white/20 text-white font-medium;
+}
+
+.nav-link-inactive {
+  @apply text-white/70 hover:bg-white/10 hover:text-white;
+}
+
+.dashboard-stat {
+  @apply bg-white rounded-lg shadow p-4 flex flex-col;
+}
+
+.form-group {
+  @apply space-y-1 mb-4;
+}
+
+.form-label {
+  @apply text-sm font-medium text-gray-700;
+}
+
+.form-control {
+  @apply w-full rounded-md border border-gray-300 shadow-sm px-3 py-2 
+  focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent;
+}
+
+.status-pending {
+  @apply bg-yellow-100 text-yellow-800 text-xs px-2 py-1 rounded-full font-medium;
+}
+
+.status-approved {
+  @apply bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full font-medium;
+}
+
+.status-rejected {
+  @apply bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full font-medium;
+}
+
+.status-draft {
+  @apply bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded-full font-medium;
+}
+
+.calendar-day {
+  @apply h-20 border border-gray-200 p-1 transition-colors;
+}
+
+.calendar-day-current {
+  @apply bg-blue-50;
+}
+
+.calendar-day-outside {
+  @apply bg-gray-50 text-gray-400;
+}
+
+.calendar-event {
+  @apply text-xs p-1 rounded mb-1 truncate;
+}
+
+.calendar-event-work {
+  @apply bg-blue-100 text-blue-800;
+}
+
+.calendar-event-leave {
+  @apply bg-red-100 text-red-800;
+}
+
+.calendar-event-holiday {
+  @apply bg-green-100 text-green-800;
 }
