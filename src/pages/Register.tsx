@@ -69,7 +69,7 @@ const Register = () => {
                       {...register("firstName", { required: "First name is required" })}
                     />
                     {errors.firstName && (
-                      <p className="text-sm text-red-500">{errors.firstName.message}</p>
+                      <p className="text-sm text-red-500">{String(errors.firstName.message)}</p>
                     )}
                   </div>
                   <div className="space-y-2">
@@ -79,7 +79,7 @@ const Register = () => {
                       {...register("lastName", { required: "Last name is required" })}
                     />
                     {errors.lastName && (
-                      <p className="text-sm text-red-500">{errors.lastName.message}</p>
+                      <p className="text-sm text-red-500">{String(errors.lastName.message)}</p>
                     )}
                   </div>
                 </div>
@@ -97,7 +97,7 @@ const Register = () => {
                     })}
                   />
                   {errors.email && (
-                    <p className="text-sm text-red-500">{errors.email.message}</p>
+                    <p className="text-sm text-red-500">{String(errors.email.message)}</p>
                   )}
                 </div>
                 <div className="space-y-2">
@@ -114,7 +114,7 @@ const Register = () => {
                     })}
                   />
                   {errors.password && (
-                    <p className="text-sm text-red-500">{errors.password.message}</p>
+                    <p className="text-sm text-red-500">{String(errors.password.message)}</p>
                   )}
                 </div>
                 <Button type="submit" disabled={isSubmitting} className="w-full">

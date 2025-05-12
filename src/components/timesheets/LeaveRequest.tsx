@@ -1,192 +1,295 @@
 
 import React, { useState } from "react";
-import { useForm } from "react-hook-form";
-import { Calendar } from "@/components/ui/calendar";
+import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { 
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar as CalendarIcon, Upload } from "lucide-react";
-import { format } from "date-fns";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { format, addDays } from "date-fns";
+import { CalendarIcon, FileText, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { toast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
-const LeaveRequest = ({ onRequestSubmitted }) => {
-  const { user } = useAuth();
-  const [isOpen, setIsOpen] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+const leaveTypesOptions = [
+  "Annual Leave",
+  "Sick Leave",
+  "Personal Leave",
+  "Bereavement Leave",
+  "Maternity/Paternity Leave",
+  "Study Leave",
+  "Other",
+];
+
+const formSchema = z.object({
+  startDate: z.date({
+    required_error: "Start date is required",
+  }),
+  endDate: z.date({
+    required_error: "End date is required",
+  }),
+  leaveType: z.string({
+    required_error: "Please select a leave type",
+  }),
+  reason: z.string().min(5, "Reason must be at least 5 characters"),
+  attachment: z.any().optional(),
+});
+
+type LeaveFormValues = z.infer<typeof formSchema>;
+
+export function LeaveRequest() {
   const [file, setFile] = useState<File | null>(null);
-  const { register, handleSubmit, reset, formState: { errors } } = useForm();
-
+  const [isUploading, setIsUploading] = useState(false);
+  const { user } = useAuth();
+  const { toast } = useToast();
+  
+  const form = useForm<LeaveFormValues>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      startDate: new Date(),
+      endDate: addDays(new Date(), 1),
+      leaveType: "",
+      reason: "",
+    },
+  });
+  
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
+    if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0]);
     }
   };
-
-  const onSubmit = async (data) => {
-    if (!selectedDate) {
+  
+  const onSubmit = async (data: LeaveFormValues) => {
+    if (!user) {
       toast({
-        title: "Date required",
-        description: "Please select a date for your leave request",
-        variant: "destructive"
+        title: "Error",
+        description: "You must be logged in to submit a leave request",
+        variant: "destructive",
       });
       return;
     }
-
-    setIsSubmitting(true);
+    
+    setIsUploading(true);
+    
     try {
-      // Insert timesheet entry with leave type
-      const { error: timesheetError } = await supabase.from("timesheets")
-        .insert({
-          user_id: user?.id,
-          date: format(selectedDate, "yyyy-MM-dd"),
-          hours_worked: 0, // 0 hours for leave day
-          description: data.reason,
-          status: "Pending"
-        });
+      let attachmentPath = null;
       
-      if (timesheetError) throw timesheetError;
-
-      // Upload supporting document if provided
+      // Upload attachment if provided
       if (file) {
         const fileExt = file.name.split('.').pop();
-        const fileName = `${user?.id}-${Date.now()}.${fileExt}`;
+        const fileName = `${user.id}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+        const filePath = `leaveRequests/${fileName}`;
         
         const { error: uploadError } = await supabase.storage
           .from('documents')
-          .upload(fileName, file);
+          .upload(filePath, file);
           
         if (uploadError) throw uploadError;
-        
-        // Save document reference
-        const { error: docError } = await supabase.from("documents")
-          .insert({
-            user_id: user?.id,
-            file_name: file.name,
-            file_url: fileName
-          });
-          
-        if (docError) throw docError;
+        attachmentPath = filePath;
       }
       
+      // Insert leave request record
+      const { error } = await supabase
+        .from('leave_requests')
+        .insert({
+          user_id: user.id,
+          start_date: data.startDate.toISOString(),
+          end_date: data.endDate.toISOString(),
+          leave_type: data.leaveType,
+          reason: data.reason,
+          attachment_path: attachmentPath,
+          status: 'pending',
+        });
+        
+      if (error) throw error;
+      
       toast({
-        title: "Leave request submitted",
-        description: "Your leave request has been submitted for approval"
+        title: "Success",
+        description: "Your leave request has been submitted successfully",
       });
       
-      reset();
+      // Reset form
+      form.reset();
       setFile(null);
-      setIsOpen(false);
-      if (onRequestSubmitted) onRequestSubmitted();
-    } catch (error) {
+      
+    } catch (error: any) {
+      console.error("Error submitting leave request:", error);
       toast({
-        title: "Submission failed",
-        description: error.message,
-        variant: "destructive"
+        title: "Error",
+        description: error.message || "Failed to submit leave request",
+        variant: "destructive",
       });
     } finally {
-      setIsSubmitting(false);
+      setIsUploading(false);
     }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <Button>Request Leave</Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
-          <DialogTitle>Request Leave</DialogTitle>
-          <DialogDescription>
-            Submit your leave request for approval. Please provide all required information.
-          </DialogDescription>
-        </DialogHeader>
-        
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-4">
-          <div className="space-y-2">
-            <Label htmlFor="date">Leave Date</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "w-full justify-start text-left font-normal",
-                    !selectedDate && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {selectedDate ? format(selectedDate, "PPP") : "Select date"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
-                <Calendar
-                  mode="single"
-                  selected={selectedDate}
-                  onSelect={setSelectedDate}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
+    <Card className="w-full">
+      <CardHeader>
+        <CardTitle>Submit Leave Request</CardTitle>
+        <CardDescription>
+          Complete the form below to submit your leave request for approval
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <Label htmlFor="startDate">Start Date</Label>
+              <Controller
+                control={form.control}
+                name="startDate"
+                render={({ field }) => (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !field.value && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {field.value ? format(field.value, "PPP") : "Select date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={field.value}
+                        onSelect={field.onChange}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                )}
+              />
+              {form.formState.errors.startDate && (
+                <p className="text-sm text-red-500">{String(form.formState.errors.startDate.message)}</p>
+              )}
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="endDate">End Date</Label>
+              <Controller
+                control={form.control}
+                name="endDate"
+                render={({ field }) => (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !field.value && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {field.value ? format(field.value, "PPP") : "Select date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={field.value}
+                        onSelect={field.onChange}
+                        initialFocus
+                        disabled={(date) => date < form.getValues("startDate")}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                )}
+              />
+              {form.formState.errors.endDate && (
+                <p className="text-sm text-red-500">{String(form.formState.errors.endDate.message)}</p>
+              )}
+            </div>
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="reason">Reason for Leave</Label>
-            <Textarea
-              id="reason"
-              placeholder="Please provide details about your leave request"
-              {...register("reason", { required: "Reason is required" })}
-              className="min-h-[100px]"
+            <Label htmlFor="leaveType">Leave Type</Label>
+            <Controller
+              control={form.control}
+              name="leaveType"
+              render={({ field }) => (
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select leave type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {leaveTypesOptions.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {type}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             />
-            {errors.reason && (
-              <p className="text-sm text-red-500">{errors.reason.message}</p>
+            {form.formState.errors.leaveType && (
+              <p className="text-sm text-red-500">{String(form.formState.errors.leaveType.message)}</p>
             )}
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="document">Supporting Document (Optional)</Label>
+            <Label htmlFor="reason">Reason for Leave</Label>
+            <Textarea 
+              id="reason"
+              placeholder="Please provide details about your leave request"
+              {...form.register("reason")}
+              className="min-h-[100px]"
+            />
+            {form.formState.errors.reason && (
+              <p className="text-sm text-red-500">{String(form.formState.errors.reason.message)}</p>
+            )}
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="attachment">Supporting Document (Optional)</Label>
             <div className="flex items-center gap-2">
               <Input
-                id="document"
+                id="attachment"
                 type="file"
                 onChange={handleFileChange}
-                accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                className="flex-1"
+                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
               />
-              <Button type="button" size="sm" variant="outline">
-                <Upload className="h-4 w-4 mr-2" />
-                Browse
-              </Button>
+              {file && (
+                <div className="flex items-center gap-2 border rounded px-3 py-1 text-sm">
+                  <FileText className="h-4 w-4 text-blue-500" />
+                  <span className="truncate max-w-[150px]">{file.name}</span>
+                </div>
+              )}
             </div>
-            <p className="text-sm text-muted-foreground">
-              Upload documents like medical certificates or approval forms (Max 5MB)
+            <p className="text-xs text-gray-500">
+              Accepted file formats: PDF, Word Documents, Images (JPG, PNG)
             </p>
           </div>
           
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Submitting..." : "Submit Request"}
-            </Button>
-          </DialogFooter>
+          <Button type="submit" className="w-full" disabled={isUploading}>
+            {isUploading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Submitting...
+              </>
+            ) : (
+              "Submit Leave Request"
+            )}
+          </Button>
         </form>
-      </DialogContent>
-    </Dialog>
+      </CardContent>
+      <CardFooter className="flex justify-between text-sm text-gray-500 border-t pt-4">
+        <p>All leave requests require approval</p>
+        <p>Processing time: 1-3 business days</p>
+      </CardFooter>
+    </Card>
   );
-};
-
-export default LeaveRequest;
+}

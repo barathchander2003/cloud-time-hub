@@ -13,7 +13,7 @@ import {
 import { useAuth } from "@/context/AuthContext";
 
 export function AppSidebar() {
-  const sidebar = useSidebar();
+  const { isCollapsed, setCollapsed } = useSidebar();
   const { user } = useAuth();
   const location = useLocation();
   
@@ -53,10 +53,10 @@ export function AppSidebar() {
   ];
 
   return (
-    <Sidebar className={sidebar.collapsed ? "w-16" : "w-64"} collapsible>
+    <Sidebar className={isCollapsed ? "w-16" : "w-64"}>
       <div className="flex h-14 items-center px-4 border-b">
         <div className="flex items-center gap-2">
-          {!sidebar.collapsed && (
+          {!isCollapsed && (
             <span className="text-xl font-bold">TimeTrack</span>
           )}
         </div>
@@ -74,20 +74,16 @@ export function AppSidebar() {
               `}
             >
               {item.icon}
-              {!sidebar.collapsed && <span>{item.label}</span>}
+              {!isCollapsed && <span>{item.label}</span>}
             </NavLink>
           ))}
         </nav>
       </SidebarContent>
       
       <div className="mt-auto p-4 border-t">
-        <SidebarTrigger className="w-full flex justify-center">
-          <div className="p-2 rounded-md hover:bg-muted">
-            {sidebar.collapsed ? (
-              <div className="w-5 h-5 border-t-2 border-l-2 rotate-135 transform transition-transform" />
-            ) : (
-              <div className="w-5 h-5 border-t-2 border-l-2 -rotate-45 transform transition-transform" />
-            )}
+        <SidebarTrigger asChild>
+          <div className="p-2 rounded-md hover:bg-muted flex justify-center cursor-pointer" onClick={() => setCollapsed(!isCollapsed)}>
+            <div className={`w-5 h-5 border-t-2 border-l-2 transform transition-transform ${isCollapsed ? "rotate-135" : "-rotate-45"}`} />
           </div>
         </SidebarTrigger>
       </div>
