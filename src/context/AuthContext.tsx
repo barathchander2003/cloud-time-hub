@@ -1,10 +1,9 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { Session } from "@supabase/supabase-js";
-import { AuthState, UserRole, User } from "@/types/auth";
+import { AuthState, User, UserRole } from "@/types/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
-// Cleanup auth state
 const cleanupAuthState = () => {
   localStorage.removeItem("supabase.auth.token");
   Object.keys(localStorage).forEach((key) => {
@@ -44,36 +43,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
   const [session, setSession] = useState<Session | null>(null);
 
-  const fetchProfileData = async (userId: string): Promise<User | null> => {
-    try {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", userId)
-        .single();
-
-      if (error) {
-        console.error("Error fetching profile:", error);
-        return null;
-      }
-
-      if (data) {
-        return {
-          id: data.id,
-          email: data.email,
-          firstName: data.first_name || "",
-          lastName: data.last_name || "",
-          role: (data.role as UserRole) || "employee",
-          avatar: data.avatar_url,
-        };
-      }
-      return null;
-    } catch (err) {
-      console.error("Error in fetchProfileData:", err);
-      return null;
-    }
-  };
-
   const mockUsers: Record<string, User> = {
     "admin@example.com": {
       id: "1",
@@ -98,155 +67,116 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     },
   };
 
+  const fetchProfileData = async (userId: string): Promise<User | null> => {
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
+        .single();
+
+      if (error) return null;
+
+      return {
+        id: data.id,
+        email: data.email,
+        firstName: data.first_name || "",
+        lastName: data.last_name || "",
+        role: (data.role as UserRole) || "employee",
+        avatar: data.avatar_url,
+      };
+    } catch {
+      return null;
+    }
+  };
+
+  const setUserStateFromSession = async (currentSession: Session | null) => {
+    if (currentSession?.user) {
+      const userData = await fetchProfileData(currentSession.user.id);
+      const defaultUser: User = {
+        id: currentSession.user.id,
+        email: currentSession.user.email,
+        firstName: currentSession.user.user_metadata?.first_name || "",
+        lastName: currentSession.user.user_metadata?.last_name || "",
+        role: currentSession.user.user_metadata?.role || "employee",
+      };
+      setState({
+        user: userData || defaultUser,
+        isAuthenticated: true,
+        isLoading: false,
+      });
+    } else {
+      setState({
+        user: null,
+        isAuthenticated: false,
+        isLoading: false,
+      });
+    }
+  };
+
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, currentSession) => {
+      async (_, currentSession) => {
         setSession(currentSession);
-        if (currentSession?.user) {
-          try {
-            const userData = await fetchProfileData(currentSession.user.id);
-            if (userData) {
-              setState({
-                user: userData,
-                isAuthenticated: true,
-                isLoading: false,
-              });
-            } else {
-              const defaultUser: User = {
-                id: currentSession.user.id,
-                email: currentSession.user.email,
-                firstName: currentSession.user.user_metadata?.first_name || "",
-                lastName: currentSession.user.user_metadata?.last_name || "",
-                role: currentSession.user.user_metadata?.role || "employee",
-              };
-              setState({
-                user: defaultUser,
-                isAuthenticated: true,
-                isLoading: false,
-              });
-            }
-          } catch (error) {
-            console.error("Auth change error:", error);
-            setState({
-              user: null,
-              isAuthenticated: false,
-              isLoading: false,
-            });
-          }
-        } else {
-          setState({ user: null, isAuthenticated: false, isLoading: false });
-        }
+        await setUserStateFromSession(currentSession);
       }
     );
 
-    supabase.auth.getSession().then(async ({ data: { session: currentSession } }) => {
-      setSession(currentSession);
-      if (currentSession?.user) {
-        try {
-          const userData = await fetchProfileData(currentSession.user.id);
-          if (userData) {
-            setState({
-              user: userData,
-              isAuthenticated: true,
-              isLoading: false,
-            });
-          } else {
-            const defaultUser: User = {
-              id: currentSession.user.id,
-              email: currentSession.user.email,
-              firstName: currentSession.user.user_metadata?.first_name || "",
-              lastName: currentSession.user.user_metadata?.last_name || "",
-              role: currentSession.user.user_metadata?.role || "employee",
-            };
-            setState({
-              user: defaultUser,
-              isAuthenticated: true,
-              isLoading: false,
-            });
-          }
-        } catch (error) {
-          console.error("Session error:", error);
-          setState({
-            user: null,
-            isAuthenticated: false,
-            isLoading: false,
-          });
-        }
-      } else {
-        setState({ user: null, isAuthenticated: false, isLoading: false });
-      }
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      setSession(session);
+      await setUserStateFromSession(session);
     });
 
-    return () => {
-      subscription.unsubscribe();
-    };
+    return () => subscription.unsubscribe();
   }, []);
 
   const login = async (email: string, password: string) => {
     setState((prev) => ({ ...prev, isLoading: true }));
+
     try {
       cleanupAuthState();
-      await supabase.auth.signOut({ scope: "global" }).catch(() => {});
+      await supabase.auth.signOut({ scope: "global" });
+
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
-      if (error) throw error;
 
-      if (data.user) {
-        try {
-          const userData = await fetchProfileData(data.user.id);
-          if (userData) {
-            setState({
-              user: userData,
-              isAuthenticated: true,
-              isLoading: false,
-            });
-          } else {
-            const defaultUser: User = {
-              id: data.user.id,
-              email: data.user.email,
-              firstName: data.user.user_metadata?.first_name || "",
-              lastName: data.user.user_metadata?.last_name || "",
-              role: data.user.user_metadata?.role || "employee",
-            };
-            setState({
-              user: defaultUser,
-              isAuthenticated: true,
-              isLoading: false,
-            });
-          }
-          setSession(data.session);
-          return;
-        } catch (err) {
-          console.error("Login fetch error:", err);
+      if (error || !data.user) {
+        // Fallback mock login for dev
+        if (mockUsers[email.toLowerCase()] && password === "password") {
           setState({
-            user: {
-              id: data.user.id,
-              email: data.user.email,
-              firstName: "",
-              lastName: "",
-              role: "employee",
-            },
+            user: mockUsers[email.toLowerCase()],
             isAuthenticated: true,
             isLoading: false,
           });
+          return;
         }
+        throw error || new Error("Invalid login credentials.");
       }
 
-      if (mockUsers[email.toLowerCase()] && password === "password") {
-        const mockUser = mockUsers[email.toLowerCase()];
-        setState({
-          user: mockUser,
-          isAuthenticated: true,
-          isLoading: false,
-        });
-        return;
-      }
+      const userData = await fetchProfileData(data.user.id);
+      const defaultUser: User = {
+        id: data.user.id,
+        email: data.user.email,
+        firstName: data.user.user_metadata?.first_name || "",
+        lastName: data.user.user_metadata?.last_name || "",
+        role: data.user.user_metadata?.role || "employee",
+      };
 
-      throw new Error("Invalid email or password");
+      setState({
+        user: userData || defaultUser,
+        isAuthenticated: true,
+        isLoading: false,
+      });
+      setSession(data.session);
     } catch (error: any) {
-      console.error("Login error:", error);
+      console.error("Login error:", error.message);
+      toast({
+        title: "Login failed",
+        description: error.message,
+        variant: "destructive",
+      });
       setState({
         user: null,
         isAuthenticated: false,
@@ -261,11 +191,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       cleanupAuthState();
       await supabase.auth.signOut({ scope: "global" });
-      setState({ user: null, isAuthenticated: false, isLoading: false });
+      setState({
+        user: null,
+        isAuthenticated: false,
+        isLoading: false,
+      });
       setSession(null);
       window.location.href = "/login";
     } catch (error: any) {
-      console.error("Logout error:", error);
       toast({
         title: "Logout failed",
         description: error.message,
