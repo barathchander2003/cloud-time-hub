@@ -1,6 +1,15 @@
 
-import React from "react";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Card,
   CardContent,
@@ -9,357 +18,394 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
-import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
+import { toast } from "@/hooks/use-toast";
+import { Check, Globe, Moon, PaintBucket, Sun, User } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 const Settings = () => {
+  const { user } = useAuth();
+  
+  // User preferences state
+  const [preferences, setPreferences] = useState({
+    theme: "light",
+    language: "en",
+    dateFormat: "DD/MM/YYYY",
+    timeFormat: "24h",
+    notifications: true,
+  });
+  
+  // Organization settings state
+  const [orgSettings, setOrgSettings] = useState({
+    name: "Market Cloud Ltd",
+    address: "123 Main Street, London, UK",
+    phone: "+44 123 456 7890",
+    email: "info@marketcloud.com",
+    website: "https://marketcloud.com",
+    taxId: "GB123456789",
+  });
+  
+  // Account settings state
+  const [accountSettings, setAccountSettings] = useState({
+    firstName: user?.firstName || "",
+    lastName: user?.lastName || "",
+    email: user?.email || "",
+    jobTitle: "Software Developer",
+    department: "Engineering",
+  });
+  
+  // Handle preference changes
+  const handlePreferenceChange = (key: string, value: string | boolean) => {
+    setPreferences({
+      ...preferences,
+      [key]: value,
+    });
+  };
+  
+  // Handle organization setting changes
+  const handleOrgChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setOrgSettings({
+      ...orgSettings,
+      [e.target.name]: e.target.value,
+    });
+  };
+  
+  // Handle account setting changes
+  const handleAccountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setAccountSettings({
+      ...accountSettings,
+      [e.target.name]: e.target.value,
+    });
+  };
+  
+  // Save preferences
+  const savePreferences = () => {
+    // Apply theme
+    document.documentElement.classList.remove("light", "dark");
+    document.documentElement.classList.add(preferences.theme);
+    
+    // In a real app, save to user profile in database
+    localStorage.setItem("userPreferences", JSON.stringify(preferences));
+    
+    toast({
+      title: "Preferences Saved",
+      description: "Your preferences have been updated successfully.",
+      duration: 3000,
+    });
+    
+    // Handle theme change
+    if (preferences.theme === "dark") {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  };
+  
+  // Save organization settings
+  const saveOrgSettings = () => {
+    // In a real app, save to database
+    localStorage.setItem("orgSettings", JSON.stringify(orgSettings));
+    
+    toast({
+      title: "Organization Settings Saved",
+      description: "Organization settings have been updated successfully.",
+      duration: 3000,
+    });
+  };
+  
+  // Save account settings
+  const saveAccountSettings = () => {
+    // In a real app, save to user profile in database
+    localStorage.setItem("accountSettings", JSON.stringify(accountSettings));
+    
+    toast({
+      title: "Account Settings Saved",
+      description: "Your account settings have been updated successfully.",
+      duration: 3000,
+    });
+  };
+  
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
         <p className="text-muted-foreground">
-          Manage your account settings and preferences
+          Manage your account settings and preferences.
         </p>
       </div>
-
-      <Tabs defaultValue="general" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="general">General</TabsTrigger>
-          <TabsTrigger value="notifications">Notifications</TabsTrigger>
-          <TabsTrigger value="organizations">Organizations</TabsTrigger>
-          <TabsTrigger value="security">Security</TabsTrigger>
+      
+      <Tabs defaultValue="preferences" className="w-full">
+        <TabsList className="mb-6 flex overflow-auto">
+          <TabsTrigger value="preferences" className="flex items-center gap-2">
+            <PaintBucket className="h-4 w-4" />
+            <span>Preferences</span>
+          </TabsTrigger>
+          <TabsTrigger value="account" className="flex items-center gap-2">
+            <User className="h-4 w-4" />
+            <span>Account</span>
+          </TabsTrigger>
+          <TabsTrigger value="organization" className="flex items-center gap-2">
+            <Globe className="h-4 w-4" />
+            <span>Organization</span>
+          </TabsTrigger>
         </TabsList>
-
-        <TabsContent value="general" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Profile</CardTitle>
-              <CardDescription>
-                Update your personal information
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="firstName">First Name</Label>
-                  <Input id="firstName" defaultValue="Admin" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="lastName">Last Name</Label>
-                  <Input id="lastName" defaultValue="User" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input id="email" defaultValue="admin@example.com" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="jobTitle">Job Title</Label>
-                  <Input id="jobTitle" defaultValue="HR Manager" />
-                </div>
-              </div>
-            </CardContent>
-            <CardFooter>
-              <Button>Save Changes</Button>
-            </CardFooter>
-          </Card>
-
+        
+        <TabsContent value="preferences">
           <Card>
             <CardHeader>
               <CardTitle>Preferences</CardTitle>
               <CardDescription>
-                Customize your application preferences
+                Customize your application experience.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="theme">Theme</Label>
-                    <p className="text-muted-foreground text-sm">
-                      Select your preferred theme
-                    </p>
-                  </div>
-                  <Select defaultValue="light">
-                    <SelectTrigger className="w-[180px]">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="theme">Theme</Label>
+                  <Select
+                    value={preferences.theme}
+                    onValueChange={(value) => handlePreferenceChange("theme", value)}
+                  >
+                    <SelectTrigger>
                       <SelectValue placeholder="Select theme" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="light">Light</SelectItem>
-                      <SelectItem value="dark">Dark</SelectItem>
+                      <SelectItem value="light" className="flex items-center gap-2">
+                        <div className="flex items-center gap-2">
+                          <Sun className="h-4 w-4" />
+                          <span>Light</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="dark">
+                        <div className="flex items-center gap-2">
+                          <Moon className="h-4 w-4" />
+                          <span>Dark</span>
+                        </div>
+                      </SelectItem>
                       <SelectItem value="system">System</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-
-                <Separator />
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="language">Language</Label>
-                    <p className="text-muted-foreground text-sm">
-                      Set your preferred language
-                    </p>
-                  </div>
-                  <Select defaultValue="en">
-                    <SelectTrigger className="w-[180px]">
+                
+                <div className="space-y-2">
+                  <Label htmlFor="language">Language</Label>
+                  <Select 
+                    value={preferences.language}
+                    onValueChange={(value) => handlePreferenceChange("language", value)}
+                  >
+                    <SelectTrigger>
                       <SelectValue placeholder="Select language" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="en">English</SelectItem>
-                      <SelectItem value="es">Spanish</SelectItem>
-                      <SelectItem value="fr">French</SelectItem>
-                      <SelectItem value="de">German</SelectItem>
-                      <SelectItem value="hi">Hindi</SelectItem>
+                      <SelectItem value="fr">Français</SelectItem>
+                      <SelectItem value="es">Español</SelectItem>
+                      <SelectItem value="de">Deutsch</SelectItem>
+                      <SelectItem value="hi">हिंदी</SelectItem>
+                      <SelectItem value="ar">العربية</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-
-                <Separator />
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Date Format</Label>
-                    <p className="text-muted-foreground text-sm">
-                      Set your preferred date format
-                    </p>
-                  </div>
-                  <Select defaultValue="MM/DD/YYYY">
-                    <SelectTrigger className="w-[180px]">
-                      <SelectValue placeholder="Select format" />
+                
+                <div className="space-y-2">
+                  <Label htmlFor="dateFormat">Date Format</Label>
+                  <Select
+                    value={preferences.dateFormat}
+                    onValueChange={(value) => handlePreferenceChange("dateFormat", value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select date format" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="MM/DD/YYYY">MM/DD/YYYY</SelectItem>
                       <SelectItem value="DD/MM/YYYY">DD/MM/YYYY</SelectItem>
+                      <SelectItem value="MM/DD/YYYY">MM/DD/YYYY</SelectItem>
                       <SelectItem value="YYYY-MM-DD">YYYY-MM-DD</SelectItem>
+                      <SelectItem value="DD-MMM-YYYY">DD-MMM-YYYY</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="timeFormat">Time Format</Label>
+                  <Select
+                    value={preferences.timeFormat}
+                    onValueChange={(value) => handlePreferenceChange("timeFormat", value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select time format" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="12h">12-hour (AM/PM)</SelectItem>
+                      <SelectItem value="24h">24-hour</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
             </CardContent>
-            <CardFooter>
-              <Button>Save Preferences</Button>
+            <CardFooter className="flex justify-end border-t pt-4">
+              <Button onClick={savePreferences} className="flex items-center gap-2">
+                <Check className="h-4 w-4" />
+                Save Preferences
+              </Button>
             </CardFooter>
           </Card>
         </TabsContent>
-
-        <TabsContent value="notifications" className="space-y-4">
+        
+        <TabsContent value="account">
           <Card>
             <CardHeader>
-              <CardTitle>Notification Settings</CardTitle>
+              <CardTitle>Account Settings</CardTitle>
               <CardDescription>
-                Configure how and when you receive notifications
+                Update your personal information.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Email Notifications</Label>
-                    <p className="text-muted-foreground text-sm">
-                      Receive email notifications for important events
-                    </p>
-                  </div>
-                  <Switch defaultChecked />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="firstName">First Name</Label>
+                  <Input
+                    id="firstName"
+                    name="firstName"
+                    value={accountSettings.firstName}
+                    onChange={handleAccountChange}
+                  />
                 </div>
-
-                <Separator />
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Timesheet Reminders</Label>
-                    <p className="text-muted-foreground text-sm">
-                      Get reminders for pending timesheet submissions
-                    </p>
-                  </div>
-                  <Switch defaultChecked />
+                <div className="space-y-2">
+                  <Label htmlFor="lastName">Last Name</Label>
+                  <Input
+                    id="lastName"
+                    name="lastName"
+                    value={accountSettings.lastName}
+                    onChange={handleAccountChange}
+                  />
                 </div>
-
-                <Separator />
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>Approval Notifications</Label>
-                    <p className="text-muted-foreground text-sm">
-                      Receive notifications for approval requests
-                    </p>
-                  </div>
-                  <Switch defaultChecked />
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    name="email"
+                    type="email"
+                    value={accountSettings.email}
+                    onChange={handleAccountChange}
+                  />
                 </div>
-                
-                <Separator />
-                
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>System Updates</Label>
-                    <p className="text-muted-foreground text-sm">
-                      Receive notifications for system updates and maintenance
-                    </p>
-                  </div>
-                  <Switch />
+                <div className="space-y-2">
+                  <Label htmlFor="jobTitle">Job Title</Label>
+                  <Input
+                    id="jobTitle"
+                    name="jobTitle"
+                    value={accountSettings.jobTitle}
+                    onChange={handleAccountChange}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="department">Department</Label>
+                  <Input
+                    id="department"
+                    name="department"
+                    value={accountSettings.department}
+                    onChange={handleAccountChange}
+                  />
                 </div>
               </div>
             </CardContent>
-            <CardFooter>
-              <Button>Save Notification Settings</Button>
+            <CardFooter className="flex justify-end border-t pt-4">
+              <Button onClick={saveAccountSettings} className="flex items-center gap-2">
+                <Check className="h-4 w-4" />
+                Save Account Settings
+              </Button>
             </CardFooter>
           </Card>
         </TabsContent>
-
-        <TabsContent value="organizations" className="space-y-4">
+        
+        <TabsContent value="organization">
           <Card>
             <CardHeader>
               <CardTitle>Organization Settings</CardTitle>
               <CardDescription>
-                Manage organization information and settings
+                Manage your organization information and branding.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <Label htmlFor="orgName">Organization Name</Label>
-                  <Input id="orgName" defaultValue="Market Cloud Ltd" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="orgLocation">Location</Label>
-                  <Input id="orgLocation" defaultValue="London, UK" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="orgContact">Contact Email</Label>
-                  <Input id="orgContact" defaultValue="contact@marketcloud.co.uk" />
+                  <Label htmlFor="org-name">Organization Name</Label>
+                  <Input
+                    id="org-name"
+                    name="name"
+                    value={orgSettings.name}
+                    onChange={handleOrgChange}
+                  />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="orgPhone">Phone</Label>
-                  <Input id="orgPhone" defaultValue="+44 20 1234 5678" />
+                  <Label htmlFor="org-address">Address</Label>
+                  <Input
+                    id="org-address"
+                    name="address"
+                    value={orgSettings.address}
+                    onChange={handleOrgChange}
+                  />
                 </div>
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="orgAddress">Address</Label>
-                  <Textarea id="orgAddress" defaultValue="123 Business Street, London, UK" />
+                <div className="space-y-2">
+                  <Label htmlFor="org-phone">Phone</Label>
+                  <Input
+                    id="org-phone"
+                    name="phone"
+                    value={orgSettings.phone}
+                    onChange={handleOrgChange}
+                  />
                 </div>
-              </div>
-              
-              <Separator className="my-4" />
-              
-              <div className="space-y-2">
-                <Label>Available Organizations</Label>
-                <div className="border rounded-md divide-y">
-                  <div className="p-3 flex justify-between items-center">
-                    <div>
-                      <p className="font-medium">Market Cloud Ltd</p>
-                      <p className="text-sm text-muted-foreground">London, UK</p>
-                    </div>
-                    <Button variant="outline" size="sm">Manage</Button>
-                  </div>
-                  <div className="p-3 flex justify-between items-center">
-                    <div>
-                      <p className="font-medium">Saas Market Cloud Software Pvt. Ltd</p>
-                      <p className="text-sm text-muted-foreground">India</p>
-                    </div>
-                    <Button variant="outline" size="sm">Manage</Button>
-                  </div>
-                  <div className="p-3 flex justify-between items-center">
-                    <div>
-                      <p className="font-medium">Market Cloud ScientiFix GmbH</p>
-                      <p className="text-sm text-muted-foreground">Germany</p>
-                    </div>
-                    <Button variant="outline" size="sm">Manage</Button>
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="org-email">Email</Label>
+                  <Input
+                    id="org-email"
+                    name="email"
+                    type="email"
+                    value={orgSettings.email}
+                    onChange={handleOrgChange}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="org-website">Website</Label>
+                  <Input
+                    id="org-website"
+                    name="website"
+                    value={orgSettings.website}
+                    onChange={handleOrgChange}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="org-taxId">Tax ID / VAT Number</Label>
+                  <Input
+                    id="org-taxId"
+                    name="taxId"
+                    value={orgSettings.taxId}
+                    onChange={handleOrgChange}
+                  />
                 </div>
               </div>
             </CardContent>
-            <CardFooter>
-              <Button>Save Organization Settings</Button>
-            </CardFooter>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="security" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Password</CardTitle>
-              <CardDescription>
-                Change your password or enable two-factor authentication
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="currentPassword">Current Password</Label>
-                <Input id="currentPassword" type="password" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="newPassword">New Password</Label>
-                <Input id="newPassword" type="password" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirm New Password</Label>
-                <Input id="confirmPassword" type="password" />
-              </div>
+            <CardFooter className="flex justify-between border-t pt-4">
+              <Select>
+                <SelectTrigger className="w-[240px]">
+                  <SelectValue placeholder="Switch Organization" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="market-cloud-uk">Market Cloud Ltd, UK</SelectItem>
+                  <SelectItem value="market-cloud-india">Market Cloud Software, India</SelectItem>
+                  <SelectItem value="market-cloud-germany">Market Cloud GmbH, Germany</SelectItem>
+                  <SelectItem value="market-cloud-hungary">Market Cloud KFT, Hungary</SelectItem>
+                </SelectContent>
+              </Select>
               
-              <Separator className="my-4" />
-              
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Two-factor Authentication</Label>
-                  <p className="text-muted-foreground text-sm">
-                    Add an extra layer of security to your account
-                  </p>
-                </div>
-                <Button variant="outline">Enable</Button>
-              </div>
-            </CardContent>
-            <CardFooter>
-              <Button>Update Password</Button>
-            </CardFooter>
-          </Card>
-          
-          <Card>
-            <CardHeader>
-              <CardTitle>Sessions</CardTitle>
-              <CardDescription>
-                Manage your active sessions and devices
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="border rounded-md divide-y">
-                  <div className="p-3 flex justify-between items-center">
-                    <div>
-                      <p className="font-medium">Chrome on Windows</p>
-                      <p className="text-sm text-muted-foreground">
-                        Active now • London, UK
-                      </p>
-                    </div>
-                    <p className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
-                      Current Session
-                    </p>
-                  </div>
-                  <div className="p-3 flex justify-between items-center">
-                    <div>
-                      <p className="font-medium">Safari on iPhone</p>
-                      <p className="text-sm text-muted-foreground">
-                        2 days ago • London, UK
-                      </p>
-                    </div>
-                    <Button variant="ghost" size="sm" className="text-red-500">
-                      Log out
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-            <CardFooter>
-              <Button variant="outline" className="text-red-600">
-                Log out of all devices
+              <Button onClick={saveOrgSettings} className="flex items-center gap-2">
+                <Check className="h-4 w-4" />
+                Save Organization
               </Button>
             </CardFooter>
           </Card>

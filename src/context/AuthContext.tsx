@@ -4,20 +4,7 @@ import { Session } from "@supabase/supabase-js";
 import { AuthState, User, UserRole } from "@/types/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-
-const cleanupAuthState = () => {
-  localStorage.removeItem("supabase.auth.token");
-  Object.keys(localStorage).forEach((key) => {
-    if (key.startsWith("supabase.auth.") || key.includes("sb-")) {
-      localStorage.removeItem(key);
-    }
-  });
-  Object.keys(sessionStorage || {}).forEach((key) => {
-    if (key.startsWith("supabase.auth.") || key.includes("sb-")) {
-      sessionStorage.removeItem(key);
-    }
-  });
-};
+import { cleanupAuthState } from "@/utils/authUtils";
 
 interface AuthContextType extends AuthState {
   login: (email: string, password: string) => Promise<void>;
@@ -70,6 +57,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchProfileData = async (userId: string): Promise<User | null> => {
     try {
+      console.log("Fetching profile data for userId:", userId);
       const { data, error } = await supabase
         .from("profiles")
         .select("*")
@@ -88,7 +76,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       return {
         id: data.id,
-        email: session?.user?.email || "", // Use email from session
+        email: session?.user?.email ?? "",
         firstName: data.first_name || "",
         lastName: data.last_name || "",
         role: (data.role as UserRole) || "employee",
@@ -106,7 +94,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const userData = await fetchProfileData(currentSession.user.id);
         const defaultUser: User = {
           id: currentSession.user.id,
-          email: currentSession.user.email || "",
+          email: currentSession.user.email ?? "",
           firstName: currentSession.user.user_metadata?.first_name || "",
           lastName: currentSession.user.user_metadata?.last_name || "",
           role: currentSession.user.user_metadata?.role || "employee",
@@ -201,7 +189,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Still set the user here for immediate feedback
       const defaultUser: User = {
         id: data.user.id,
-        email: data.user.email || "",
+        email: data.user.email ?? "",
         firstName: data.user.user_metadata?.first_name || "",
         lastName: data.user.user_metadata?.last_name || "",
         role: data.user.user_metadata?.role || "employee",
@@ -231,6 +219,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async () => {
+    console.log("Logout called");
     setState((prev) => ({ ...prev, isLoading: true }));
     try {
       cleanupAuthState();
@@ -241,6 +230,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoading: false,
       });
       setSession(null);
+      console.log("Logout successful");
+      // Use window.location for a full page refresh to ensure clean state
       window.location.href = "/login";
     } catch (error: any) {
       console.error("Logout error:", error.message);

@@ -5,6 +5,7 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
 import { AppHeader } from "./AppHeader";
 import { useAuth } from "@/context/AuthContext";
+import { toast } from "@/hooks/use-toast";
 
 export function AppLayout() {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -26,16 +27,20 @@ export function AppLayout() {
   
   // Redirect to login if not authenticated
   if (!isAuthenticated || !user) {
+    toast({
+      title: "Authentication required",
+      description: "Please log in to access this page.",
+    });
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
   
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full">
+      <div className="min-h-screen flex w-full flex-col md:flex-row">
         <AppSidebar />
-        <div className="flex flex-col flex-1 overflow-x-hidden">
+        <div className="flex flex-col flex-1 overflow-x-hidden w-full">
           <AppHeader />
-          <main className="flex-1 p-6">
+          <main className="flex-1 p-4 md:p-6 overflow-auto">
             <Outlet />
           </main>
         </div>

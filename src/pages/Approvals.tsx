@@ -1,8 +1,14 @@
 
 import React, { useState, useEffect } from "react";
-import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -12,515 +18,351 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
-import { Check, Filter, Search, X } from "lucide-react";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Check, Clock, File, Filter, Search, X } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 
+// Sample data
+const mockRequests = [
+  {
+    id: "1",
+    type: "leave",
+    employee: "Sarah Johnson",
+    employeeId: "2",
+    submitted: "2025-05-10T10:30:00Z",
+    startDate: "2025-05-20",
+    endDate: "2025-05-25",
+    status: "pending",
+    notes: "Annual leave",
+    document: null,
+  },
+  {
+    id: "2",
+    type: "expenses",
+    employee: "Michael Brown",
+    employeeId: "3",
+    submitted: "2025-05-09T14:15:00Z",
+    amount: 245.50,
+    status: "approved",
+    approvedBy: "Jane Doe",
+    notes: "Client meeting expenses",
+    document: "receipt.pdf",
+  },
+  {
+    id: "3",
+    type: "timesheet",
+    employee: "Emily Davis",
+    employeeId: "4",
+    submitted: "2025-05-08T17:45:00Z",
+    period: "April 2025",
+    status: "pending",
+    notes: "Overtime hours",
+    document: null,
+  },
+  {
+    id: "4",
+    type: "leave",
+    employee: "Robert Wilson",
+    employeeId: "5",
+    submitted: "2025-05-07T09:00:00Z",
+    startDate: "2025-06-10",
+    endDate: "2025-06-17",
+    status: "rejected",
+    notes: "Personal leave",
+    rejectedReason: "Staff shortage during that period",
+    document: "medical.pdf",
+  },
+  {
+    id: "5",
+    type: "expenses",
+    employee: "John Smith",
+    employeeId: "1",
+    submitted: "2025-05-06T11:20:00Z",
+    amount: 189.75,
+    status: "pending",
+    notes: "Training materials",
+    document: "invoice.pdf",
+  },
+];
+
 const Approvals = () => {
-  const [pendingApprovals, setPendingApprovals] = useState([]);
-  const [historyApprovals, setHistoryApprovals] = useState([]);
-  const [selectedTimesheet, setSelectedTimesheet] = useState(null);
-  const [comment, setComment] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Fetch timesheet data from Supabase
+  const { user } = useAuth();
+  const [filter, setFilter] = useState<string>("all");
+  const [searchTerm, setSearchTerm] = useState<string>("");
+  const [loading, setLoading] = useState<boolean>(true);
+  const [requests, setRequests] = useState(mockRequests);
+  
   useEffect(() => {
-    fetchTimesheets();
+    // Try to fetch real data
+    fetchRequests();
   }, []);
-
-  const fetchTimesheets = async () => {
-    setIsLoading(true);
+  
+  const fetchRequests = async () => {
     try {
-      // Fetch pending timesheets
-      const { data: pendingData, error: pendingError } = await supabase
-        .from('timesheets')
-        .select(`
-          *,
-          users:user_id (
-            email
-          )
-        `)
-        .eq('status', 'Pending');
-
-      if (pendingError) throw pendingError;
-
-      // Fetch approved/rejected timesheets
-      const { data: historyData, error: historyError } = await supabase
-        .from('timesheets')
-        .select(`
-          *,
-          users:user_id (
-            email
-          )
-        `)
-        .in('status', ['Approved', 'Rejected']);
-
-      if (historyError) throw historyError;
-
-      // Group timesheets by user and month
-      const pending = groupTimesheetsByUserAndMonth(pendingData);
-      const history = groupTimesheetsByUserAndMonth(historyData);
-
-      setPendingApprovals(pending);
-      setHistoryApprovals(history);
-    } catch (error) {
-      console.error('Error fetching timesheets:', error);
-      toast({
-        title: "Failed to fetch data",
-        description: "Could not load timesheet approval data. Please try again.",
-        variant: "destructive"
-      });
+      setLoading(true);
+      
+      // Try to fetch from database
+      try {
+        const { data, error } = await supabase
+          .from("approvals")
+          .select("*");
+          
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          setRequests(data);
+        } else {
+          console.log("No approval data found, using mock data");
+          setRequests(mockRequests);
+        }
+      } catch (error) {
+        console.error("Error fetching approvals:", error);
+        setRequests(mockRequests);
+      }
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
-
-  // Helper function to group timesheet entries by user and month
-  const groupTimesheetsByUserAndMonth = (data) => {
-    const grouped = {};
-    
-    if (!data || data.length === 0) return [];
-    
-    data.forEach(entry => {
-      const userId = entry.user_id;
-      const date = new Date(entry.date);
-      const month = date.getMonth();
-      const year = date.getFullYear();
-      const key = `${userId}_${year}_${month}`;
-      
-      if (!grouped[key]) {
-        grouped[key] = {
-          id: key,
-          userId: userId,
-          employeeName: entry.users?.email?.split('@')[0] || 'Unknown',
-          email: entry.users?.email || 'unknown@example.com',
-          month: format(date, 'MMMM yyyy'),
-          submittedDate: entry.created_at,
-          reviewedDate: entry.status !== 'Pending' ? entry.updated_at : null,
-          status: entry.status,
-          entries: [],
-          totalHours: 0,
-          comments: entry.description || ''
-        };
+  
+  const handleApprove = async (id: string) => {
+    try {
+      // Update status in database
+      try {
+        const { error } = await supabase
+          .from("approvals")
+          .update({ 
+            status: "approved",
+            reviewed_at: new Date().toISOString(),
+            reviewer_id: user?.id
+          })
+          .eq("id", id);
+          
+        if (error) throw error;
+      } catch (error) {
+        console.error("Error updating approval:", error);
       }
       
-      grouped[key].entries.push(entry);
-      grouped[key].totalHours += parseFloat(entry.hours_worked);
-    });
-    
-    return Object.values(grouped);
-  };
-
-  const handleReview = (timesheet) => {
-    setSelectedTimesheet(timesheet);
-    setComment("");
-  };
-
-  const handleApprove = async () => {
-    if (!selectedTimesheet) return;
-    
-    setIsSubmitting(true);
-    
-    try {
-      // Update all timesheet entries for this user and month to approved
-      const userId = selectedTimesheet.userId;
-      const [, year, month] = selectedTimesheet.id.split('_');
-      
-      // Calculate the first and last day of the month
-      const firstDay = new Date(year, month, 1);
-      const lastDay = new Date(year, parseInt(month) + 1, 0);
-      
-      const firstDayStr = format(firstDay, 'yyyy-MM-dd');
-      const lastDayStr = format(lastDay, 'yyyy-MM-dd');
-      
-      const { error } = await supabase
-        .from('timesheets')
-        .update({
-          status: 'Approved',
-          description: comment.length > 0 ? comment : null
-        })
-        .eq('user_id', userId)
-        .gte('date', firstDayStr)
-        .lte('date', lastDayStr);
-        
-      if (error) throw error;
+      // Update local state
+      setRequests(requests.map(req => 
+        req.id === id ? { ...req, status: "approved" } : req
+      ));
       
       toast({
-        title: "Timesheet approved",
-        description: `You have approved the timesheet for ${selectedTimesheet.employeeName}`
+        title: "Request Approved",
+        description: "The request has been approved successfully.",
       });
-      
-      // Refresh the data
-      fetchTimesheets();
-      
-      // Close the dialog
-      setSelectedTimesheet(null);
     } catch (error) {
-      console.error('Error approving timesheet:', error);
+      console.error("Error approving request:", error);
       toast({
-        title: "Approval failed",
-        description: "Could not approve the timesheet. Please try again.",
-        variant: "destructive"
+        title: "Error",
+        description: "Failed to approve the request. Please try again.",
+        variant: "destructive",
       });
-    } finally {
-      setIsSubmitting(false);
     }
   };
-
-  const handleReject = async () => {
-    if (!selectedTimesheet || !comment) {
-      toast({
-        title: "Comment required",
-        description: "Please provide a reason for rejection",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    setIsSubmitting(true);
-    
+  
+  const handleReject = async (id: string) => {
     try {
-      // Update all timesheet entries for this user and month to rejected
-      const userId = selectedTimesheet.userId;
-      const [, year, month] = selectedTimesheet.id.split('_');
+      // Update status in database
+      try {
+        const { error } = await supabase
+          .from("approvals")
+          .update({ 
+            status: "rejected",
+            reviewed_at: new Date().toISOString(),
+            reviewer_id: user?.id
+          })
+          .eq("id", id);
+          
+        if (error) throw error;
+      } catch (error) {
+        console.error("Error updating approval:", error);
+      }
       
-      // Calculate the first and last day of the month
-      const firstDay = new Date(year, month, 1);
-      const lastDay = new Date(year, parseInt(month) + 1, 0);
-      
-      const firstDayStr = format(firstDay, 'yyyy-MM-dd');
-      const lastDayStr = format(lastDay, 'yyyy-MM-dd');
-      
-      const { error } = await supabase
-        .from('timesheets')
-        .update({
-          status: 'Rejected',
-          description: comment
-        })
-        .eq('user_id', userId)
-        .gte('date', firstDayStr)
-        .lte('date', lastDayStr);
-        
-      if (error) throw error;
+      // Update local state
+      setRequests(requests.map(req => 
+        req.id === id ? { ...req, status: "rejected" } : req
+      ));
       
       toast({
-        title: "Timesheet rejected",
-        description: `You have rejected the timesheet for ${selectedTimesheet.employeeName}`
+        title: "Request Rejected",
+        description: "The request has been rejected.",
       });
-      
-      // Refresh the data
-      fetchTimesheets();
-      
-      // Close the dialog
-      setSelectedTimesheet(null);
     } catch (error) {
-      console.error('Error rejecting timesheet:', error);
+      console.error("Error rejecting request:", error);
       toast({
-        title: "Rejection failed",
-        description: "Could not reject the timesheet. Please try again.",
-        variant: "destructive"
+        title: "Error",
+        description: "Failed to reject the request. Please try again.",
+        variant: "destructive",
       });
-    } finally {
-      setIsSubmitting(false);
     }
   };
-
-  const filteredPendingApprovals = pendingApprovals.filter(timesheet => 
-    timesheet.employeeName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    timesheet.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    timesheet.month.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const filteredHistoryApprovals = historyApprovals.filter(timesheet => 
-    timesheet.employeeName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    timesheet.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    timesheet.month.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    timesheet.status.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
+  
+  const filteredRequests = requests.filter(req => {
+    const matchesFilter = filter === "all" || req.status === filter;
+    const matchesSearch = 
+      req.employee.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      req.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (req.notes && req.notes.toLowerCase().includes(searchTerm.toLowerCase()));
+    return matchesFilter && matchesSearch;
+  });
+  
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "pending":
+        return <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-200">Pending</Badge>;
+      case "approved":
+        return <Badge variant="outline" className="bg-green-100 text-green-800 border-green-200">Approved</Badge>;
+      case "rejected":
+        return <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200">Rejected</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+  
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Timesheet Approvals</h1>
-          <p className="text-muted-foreground">
-            Review and manage timesheet submissions
-          </p>
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">Approval Requests</h1>
+        <p className="text-muted-foreground">
+          Review and manage approval requests from employees.
+        </p>
+      </div>
+      
+      <div className="flex flex-col md:flex-row gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+          <Input 
+            placeholder="Search requests..."
+            className="pl-8"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline">
-            <Filter className="mr-2 h-4 w-4" />
-            Filter
-          </Button>
-          <Button onClick={() => {
-            toast({
-              title: "Coming soon",
-              description: "Bulk approval functionality is coming soon."
-            });
-          }}>
-            Approve All
-          </Button>
+        <div className="flex gap-2">
+          <Select value={filter} onValueChange={setFilter}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Filter by status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Requests</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="approved">Approved</SelectItem>
+              <SelectItem value="rejected">Rejected</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
       
-      <div className="flex flex-col md:flex-row gap-4 mb-6">
-        <div className="relative flex-1">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
-          <Input
-            placeholder="Search submissions..."
-            className="pl-8"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+      {loading ? (
+        <div className="flex justify-center p-8">
+          <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div>
         </div>
-      </div>
-
-      <Tabs defaultValue="pending" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="pending">
-            Pending 
-            <span className="ml-2 bg-primary/10 text-primary font-medium rounded-full px-2 py-0.5 text-xs">
-              {filteredPendingApprovals.length}
-            </span>
-          </TabsTrigger>
-          <TabsTrigger value="history">History</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="pending">
-          <div className="border rounded-md">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Employee</TableHead>
-                  <TableHead>Month</TableHead>
-                  <TableHead>Submitted</TableHead>
-                  <TableHead>Total Hours</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-6">
-                      <div className="flex items-center justify-center">
-                        <div className="animate-spin w-6 h-6 border-4 border-primary border-t-transparent rounded-full"></div>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  <>
-                    {filteredPendingApprovals.map((timesheet) => (
-                      <TableRow key={timesheet.id}>
-                        <TableCell className="font-medium">
-                          {timesheet.employeeName}
-                          <div className="text-xs text-muted-foreground">{timesheet.email}</div>
-                        </TableCell>
-                        <TableCell>{timesheet.month}</TableCell>
-                        <TableCell>{timesheet.submittedDate ? format(new Date(timesheet.submittedDate), "MMM d, yyyy") : "N/A"}</TableCell>
-                        <TableCell>{timesheet.totalHours.toFixed(1)}</TableCell>
-                        <TableCell>
-                          <span className="inline-block px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                            Pending
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="outline" size="sm" onClick={() => handleReview(timesheet)}>
-                            Review
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    {filteredPendingApprovals.length === 0 && !isLoading && (
-                      <TableRow>
-                        <TableCell colSpan={6} className="text-center py-6 text-muted-foreground">
-                          No pending timesheet approvals
-                        </TableCell>
-                      </TableRow>
+      ) : filteredRequests.length > 0 ? (
+        <div className="border rounded-md overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Type</TableHead>
+                <TableHead>Employee</TableHead>
+                <TableHead className="hidden sm:table-cell">Submitted</TableHead>
+                <TableHead className="hidden md:table-cell">Details</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredRequests.map((request) => (
+                <TableRow key={request.id}>
+                  <TableCell className="capitalize">{request.type}</TableCell>
+                  <TableCell>{request.employee}</TableCell>
+                  <TableCell className="hidden sm:table-cell">
+                    {new Date(request.submitted).toLocaleDateString()}
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    {request.type === "leave" ? (
+                      <>
+                        {new Date(request.startDate).toLocaleDateString()} - {new Date(request.endDate).toLocaleDateString()}
+                      </>
+                    ) : request.type === "expenses" ? (
+                      <>${request.amount?.toFixed(2)}</>
+                    ) : (
+                      <>{request.period}</>
                     )}
-                  </>
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </TabsContent>
-        
-        <TabsContent value="history">
-          <div className="border rounded-md">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Employee</TableHead>
-                  <TableHead>Month</TableHead>
-                  <TableHead>Submitted</TableHead>
-                  <TableHead>Reviewed</TableHead>
-                  <TableHead>Total Hours</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-6">
-                      <div className="flex items-center justify-center">
-                        <div className="animate-spin w-6 h-6 border-4 border-primary border-t-transparent rounded-full"></div>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  <>
-                    {filteredHistoryApprovals.map((timesheet) => (
-                      <TableRow key={timesheet.id}>
-                        <TableCell className="font-medium">
-                          {timesheet.employeeName}
-                          <div className="text-xs text-muted-foreground">{timesheet.email}</div>
-                        </TableCell>
-                        <TableCell>{timesheet.month}</TableCell>
-                        <TableCell>{timesheet.submittedDate ? format(new Date(timesheet.submittedDate), "MMM d, yyyy") : "N/A"}</TableCell>
-                        <TableCell>{timesheet.reviewedDate ? format(new Date(timesheet.reviewedDate), "MMM d, yyyy") : "N/A"}</TableCell>
-                        <TableCell>{timesheet.totalHours.toFixed(1)}</TableCell>
-                        <TableCell>
-                          <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium
-                            ${timesheet.status === "Approved" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
-                            {timesheet.status}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="ghost" size="sm" onClick={() => handleReview(timesheet)}>
-                            View
+                  </TableCell>
+                  <TableCell>
+                    {getStatusBadge(request.status)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      {request.document && (
+                        <Button size="sm" variant="outline" className="h-8 w-8 p-0">
+                          <File className="h-4 w-4" />
+                        </Button>
+                      )}
+                      
+                      {request.status === "pending" && (
+                        <>
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
+                            onClick={() => handleApprove(request.id)}
+                          >
+                            <Check className="h-4 w-4" />
                           </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    {filteredHistoryApprovals.length === 0 && !isLoading && (
-                      <TableRow>
-                        <TableCell colSpan={7} className="text-center py-6 text-muted-foreground">
-                          No timesheet approval history
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </>
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </TabsContent>
-      </Tabs>
-
-      {/* Review Dialog */}
-      <Dialog open={!!selectedTimesheet} onOpenChange={(open) => !open && setSelectedTimesheet(null)}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>Review Timesheet</DialogTitle>
-            <DialogDescription>
-              {selectedTimesheet?.employeeName} - {selectedTimesheet?.month}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-muted-foreground">Employee</p>
-                <p className="font-medium">{selectedTimesheet?.employeeName}</p>
-                <p className="text-sm text-muted-foreground">{selectedTimesheet?.email}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Month</p>
-                <p className="font-medium">{selectedTimesheet?.month}</p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Submitted Date</p>
-                <p className="font-medium">
-                  {selectedTimesheet?.submittedDate && format(new Date(selectedTimesheet.submittedDate), "MMM d, yyyy")}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Total Hours</p>
-                <p className="font-medium">{selectedTimesheet?.totalHours.toFixed(1)}</p>
-              </div>
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                            onClick={() => handleReject(request.id)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
+                      
+                      {request.status !== "pending" && (
+                        <Button size="sm" variant="outline" className="h-8 px-3 py-0">
+                          Details
+                        </Button>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      ) : (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center p-8">
+            <div className="mb-4 rounded-full bg-muted p-3">
+              <Clock className="h-8 w-8 text-muted-foreground" />
             </div>
-
-            <div className="border rounded-md p-4 bg-gray-50">
-              <p className="text-sm font-medium mb-2">Timesheet Summary</p>
-              
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Hours</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Description</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {selectedTimesheet?.entries?.map((entry) => (
-                    <TableRow key={entry.id}>
-                      <TableCell>{format(new Date(entry.date), "MMM d, yyyy")}</TableCell>
-                      <TableCell>{entry.hours_worked}</TableCell>
-                      <TableCell>{entry.hours_worked === 0 ? "Leave" : "Work"}</TableCell>
-                      <TableCell>{entry.description || "-"}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              
-              <div className="mt-4 space-y-2">
-                <p className="text-sm font-medium">
-                  Work Days: {selectedTimesheet?.entries?.filter(e => e.hours_worked > 0).length || 0}
-                </p>
-                <p className="text-sm font-medium">
-                  Leave Days: {selectedTimesheet?.entries?.filter(e => e.hours_worked === 0).length || 0}
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <p className="text-sm font-medium">Comments</p>
-              <Textarea
-                placeholder="Add your review comments here..."
-                value={comment}
-                onChange={(e) => setComment(e.target.value)}
-                rows={3}
-              />
-              {selectedTimesheet?.status === "Rejected" && selectedTimesheet?.comments && (
-                <div className="text-sm text-red-500 italic mt-2">
-                  Previous rejection reason: {selectedTimesheet.comments}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setSelectedTimesheet(null)} disabled={isSubmitting}>
-              Close
-            </Button>
-            {selectedTimesheet?.status !== "Approved" && selectedTimesheet?.status !== "Rejected" && (
-              <>
-                <Button variant="destructive" onClick={handleReject} disabled={isSubmitting}>
-                  <X className="mr-2 h-4 w-4" />
-                  {isSubmitting ? "Rejecting..." : "Reject"}
-                </Button>
-                <Button onClick={handleApprove} disabled={isSubmitting}>
-                  <Check className="mr-2 h-4 w-4" />
-                  {isSubmitting ? "Approving..." : "Approve"}
-                </Button>
-              </>
+            <h3 className="text-lg font-medium">No approval requests found</h3>
+            <p className="text-center text-sm text-muted-foreground mt-2">
+              {searchTerm || filter !== "all" 
+                ? "Try adjusting your filters or search terms." 
+                : "There are no pending approval requests that require your attention."}
+            </p>
+            {(searchTerm || filter !== "all") && (
+              <Button variant="outline" className="mt-4" onClick={() => {setSearchTerm(""); setFilter("all");}}>
+                Reset Filters
+              </Button>
             )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };

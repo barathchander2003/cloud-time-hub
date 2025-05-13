@@ -1,13 +1,38 @@
 
 import React from "react";
-import { Bell, Menu, Search } from "lucide-react";
+import { Bell, LogOut, Menu, Search, Settings } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/context/AuthContext";
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger 
+} from "@/components/ui/dropdown-menu";
+import { toast } from "@/hooks/use-toast";
 
 export function AppHeader() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  
+  const handleLogout = async () => {
+    try {
+      await logout();
+      toast({
+        title: "Logged out successfully",
+        description: "You have been logged out of the system.",
+      });
+    } catch (error) {
+      console.error("Logout error:", error);
+      toast({
+        title: "Logout failed",
+        description: "There was an issue logging out. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
   
   if (!user) return null;
   
@@ -39,16 +64,31 @@ export function AppHeader() {
           <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-red-500"></span>
         </Button>
         
-        <div className="flex items-center gap-3">
-          <div className="text-right">
-            <div className="font-medium text-sm">{user.firstName} {user.lastName}</div>
-            <div className="text-xs text-gray-500 capitalize">{user.role}</div>
-          </div>
-          
-          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-white font-bold">
-            {user.firstName[0]}
-          </div>
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <div className="flex items-center gap-3 cursor-pointer">
+              <div className="text-right hidden sm:block">
+                <div className="font-medium text-sm">{user.firstName} {user.lastName}</div>
+                <div className="text-xs text-gray-500 capitalize">{user.role}</div>
+              </div>
+              
+              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-white font-bold">
+                {user.firstName ? user.firstName[0] : "U"}
+              </div>
+            </div>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem className="cursor-pointer">
+              <Settings className="mr-2 h-4 w-4" />
+              <span>Account Settings</span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-destructive">
+              <LogOut className="mr-2 h-4 w-4" />
+              <span>Logout</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </header>
   );

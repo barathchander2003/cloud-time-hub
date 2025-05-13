@@ -55,7 +55,7 @@ export function AppSidebar() {
   ];
 
   return (
-    <Sidebar className={isCollapsed ? "w-16" : "w-64"}>
+    <Sidebar className={`${isCollapsed ? "w-16" : "w-64"} transition-all duration-300 md:relative absolute z-20 h-screen`}>
       <div className="flex h-14 items-center px-4 border-b">
         <div className="flex items-center gap-2">
           {!isCollapsed && (
@@ -83,12 +83,12 @@ export function AppSidebar() {
       </SidebarContent>
       
       <div className="mt-auto p-4 border-t">
-        {/* Fix: Wrap the div in a React Fragment instead of using asChild prop */}
-        <SidebarTrigger>
-          <div className="p-2 rounded-md hover:bg-muted flex justify-center cursor-pointer" onClick={toggleSidebar}>
-            <div className={`w-5 h-5 border-t-2 border-l-2 transform transition-transform ${isCollapsed ? "rotate-135" : "-rotate-45"}`} />
-          </div>
-        </SidebarTrigger>
+        <div 
+          className="p-2 rounded-md hover:bg-muted flex justify-center cursor-pointer"
+          onClick={toggleSidebar}
+        >
+          <div className={`w-5 h-5 border-t-2 border-l-2 transform transition-transform ${isCollapsed ? "rotate-135" : "-rotate-45"}`} />
+        </div>
       </div>
     </Sidebar>
   );
