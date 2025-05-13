@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -37,8 +36,9 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
-import { useSupabaseQuery, updateSupabaseRecord } from "@/hooks/use-supabase";
-import { ApprovalData, formatApprovalForUI } from "@/types/database";
+import { supabase } from "@/integrations/supabase/client";
+import { ApprovalData, formatApprovalForUI, Tables } from "@/types/database";
+import { downloadFile } from "@/services/storage-service";
 
 // Sample data as fallback
 const mockRequests: ApprovalData[] = [
@@ -109,42 +109,66 @@ const Approvals = () => {
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [selectedRequest, setSelectedRequest] = useState<ApprovalData | null>(null);
   const [showDetailsDialog, setShowDetailsDialog] = useState<boolean>(false);
-  
-  // Use our custom hook to fetch approvals
-  const { data: approvalsData, loading, error } = useSupabaseQuery('approvals', {
-    orderBy: { column: 'submitted_at', ascending: false }
-  });
-  
+  const [loading, setLoading] = useState<boolean>(true);
   const [requests, setRequests] = useState<ApprovalData[]>(mockRequests);
   
   useEffect(() => {
-    if (approvalsData && approvalsData.length > 0) {
-      // Map database approvals to UI format
-      const formattedApprovals = approvalsData.map(formatApprovalForUI);
-      setRequests(formattedApprovals);
+    fetchApprovals();
+  }, [filter]);
+  
+  const fetchApprovals = async () => {
+    try {
+      setLoading(true);
+      
+      const { data, error } = await supabase
+        .from('approvals')
+        .select('*')
+        .order('submitted_at', { ascending: false });
+      
+      if (error) throw error;
+      
+      if (data && data.length > 0) {
+        // Map database approvals to UI format
+        const formattedApprovals = data.map((approval: Tables<'approvals'>) => 
+          formatApprovalForUI(approval)
+        );
+        setRequests(formattedApprovals);
+      }
+    } catch (error: any) {
+      console.error("Error fetching approvals:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load approval requests",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
-  }, [approvalsData]);
+  };
   
   const handleApprove = async (id: string) => {
     try {
-      const result = await updateSupabaseRecord('approvals', id, { 
-        status: "approved",
-        reviewed_at: new Date().toISOString(),
-        reviewer_id: user?.id
-      });
+      const { error } = await supabase
+        .from('approvals')
+        .update({ 
+          status: "approved",
+          reviewed_at: new Date().toISOString(),
+          reviewer_id: user?.id
+        })
+        .eq('id', id);
       
-      if (result.success) {
-        // Update local state
-        setRequests(requests.map(req => 
-          req.id === id ? { ...req, status: "approved" } : req
-        ));
-        
-        toast({
-          title: "Request Approved",
-          description: "The request has been approved successfully.",
-        });
-      }
-    } catch (error) {
+      if (error) throw error;
+      
+      // Update local state
+      setRequests(requests.map(req => 
+        req.id === id ? { ...req, status: "approved" } : req
+      ));
+      
+      toast({
+        title: "Request Approved",
+        description: "The request has been approved successfully.",
+      });
+    } catch (error: any) {
       console.error("Error approving request:", error);
       toast({
         title: "Error",
@@ -156,24 +180,27 @@ const Approvals = () => {
   
   const handleReject = async (id: string) => {
     try {
-      const result = await updateSupabaseRecord('approvals', id, { 
-        status: "rejected",
-        reviewed_at: new Date().toISOString(),
-        reviewer_id: user?.id
-      });
+      const { error } = await supabase
+        .from('approvals')
+        .update({ 
+          status: "rejected",
+          reviewed_at: new Date().toISOString(),
+          reviewer_id: user?.id
+        })
+        .eq('id', id);
       
-      if (result.success) {
-        // Update local state
-        setRequests(requests.map(req => 
-          req.id === id ? { ...req, status: "rejected" } : req
-        ));
-        
-        toast({
-          title: "Request Rejected",
-          description: "The request has been rejected.",
-        });
-      }
-    } catch (error) {
+      if (error) throw error;
+      
+      // Update local state
+      setRequests(requests.map(req => 
+        req.id === id ? { ...req, status: "rejected" } : req
+      ));
+      
+      toast({
+        title: "Request Rejected",
+        description: "The request has been rejected.",
+      });
+    } catch (error: any) {
       console.error("Error rejecting request:", error);
       toast({
         title: "Error",
@@ -188,11 +215,44 @@ const Approvals = () => {
     setShowDetailsDialog(true);
   };
   
+  const handleDownloadDocument = async (documentUrl: string | null | undefined) => {
+    if (!documentUrl) {
+      toast({
+        title: "Error",
+        description: "No document available to download",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    try {
+      // Extract the bucket name and file path from the URL
+      const url = new URL(documentUrl);
+      const pathParts = url.pathname.split('/');
+      const bucketName = pathParts[1]; // Assumes format: /storage/v1/object/public/[bucket-name]/[file-path]
+      const filePath = pathParts.slice(2).join('/');
+      
+      await downloadFile(bucketName, filePath);
+      
+      toast({
+        title: "Download Started",
+        description: "Your document download has started.",
+      });
+    } catch (error: any) {
+      console.error("Error downloading document:", error);
+      toast({
+        title: "Download Failed",
+        description: error.message || "Could not download document",
+        variant: "destructive",
+      });
+    }
+  };
+  
   const filteredRequests = requests.filter(req => {
     const matchesFilter = filter === "all" || req.status === filter;
     const matchesSearch = 
-      req.employee.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      req.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      req.employee?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      req.type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (req.notes && req.notes.toLowerCase().includes(searchTerm.toLowerCase()));
     return matchesFilter && matchesSearch;
   });
@@ -295,11 +355,7 @@ const Approvals = () => {
                           size="sm" 
                           variant="outline" 
                           className="h-8 w-8 p-0"
-                          onClick={() => {
-                            if (request.document) {
-                              window.open(request.document, '_blank');
-                            }
-                          }}
+                          onClick={() => handleDownloadDocument(request.document)}
                         >
                           <File className="h-4 w-4" />
                         </Button>
@@ -422,11 +478,7 @@ const Approvals = () => {
                   <Button 
                     variant="outline" 
                     size="sm"
-                    onClick={() => {
-                      if (selectedRequest?.document) {
-                        window.open(selectedRequest.document, '_blank');
-                      }
-                    }}
+                    onClick={() => handleDownloadDocument(selectedRequest.document)}
                   >
                     <File className="mr-2 h-4 w-4" />
                     View Document

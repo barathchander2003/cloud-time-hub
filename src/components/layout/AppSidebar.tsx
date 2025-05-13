@@ -63,7 +63,7 @@ export function AppSidebar() {
   };
 
   return (
-    <Sidebar className={`${isCollapsed ? "w-16" : "w-64"} transition-all duration-300 md:relative fixed z-20 h-screen`}>
+    <Sidebar className={`${isCollapsed ? "w-16" : "w-64"} transition-all duration-300 md:relative fixed z-20 h-screen flex flex-col`}>
       <div className="flex h-14 items-center px-4 border-b">
         <div className="flex items-center gap-2">
           {!isCollapsed && (
@@ -72,7 +72,7 @@ export function AppSidebar() {
         </div>
       </div>
       
-      <SidebarContent className="p-2 flex flex-col h-[calc(100%-8rem)]">
+      <SidebarContent className="p-2 flex flex-col flex-1">
         <nav className="flex flex-col gap-1">
           {navItems.map((item) => (
             <NavLink
@@ -90,7 +90,7 @@ export function AppSidebar() {
         </nav>
       </SidebarContent>
       
-      <div className="absolute bottom-0 w-full p-4 border-t">
+      <div className="p-4 border-t">
         <Button 
           variant="ghost" 
           className="w-full flex justify-center items-center gap-2" 

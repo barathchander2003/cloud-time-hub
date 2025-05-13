@@ -5,7 +5,7 @@ import { toast } from '@/hooks/use-toast';
 import { Tables } from '@/types/database';
 
 // Custom hook for fetching data from any table with proper typing
-export function useSupabaseQuery<T extends keyof Tables>(
+export function useSupabaseQuery<T extends keyof Database['public']['Tables']>(
   tableName: T,
   options: {
     columns?: string;
@@ -14,7 +14,7 @@ export function useSupabaseQuery<T extends keyof Tables>(
     limit?: number;
   } = {}
 ) {
-  const [data, setData] = useState<Tables[T][]>([]);
+  const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
@@ -23,8 +23,7 @@ export function useSupabaseQuery<T extends keyof Tables>(
       try {
         setLoading(true);
         
-        // Use type assertion to work around TypeScript limitations
-        let query = supabase.from(tableName as string);
+        let query = supabase.from(tableName);
         
         if (options.columns) {
           query = query.select(options.columns);
@@ -57,8 +56,7 @@ export function useSupabaseQuery<T extends keyof Tables>(
         
         if (error) throw error;
         
-        // Type assertion to handle the custom tables
-        setData(result as Tables[T][]);
+        setData(result || []);
       } catch (err: any) {
         setError(err);
         console.error(`Error fetching ${String(tableName)}:`, err);
@@ -79,15 +77,14 @@ export function useSupabaseQuery<T extends keyof Tables>(
 }
 
 // Helper function to update data in any table
-export async function updateSupabaseRecord<T extends keyof Tables>(
+export async function updateSupabaseRecord<T extends keyof Database['public']['Tables']>(
   tableName: T,
   id: string,
-  data: Partial<Tables[T]>
+  data: Partial<any>
 ) {
   try {
-    // Use type assertion to work around TypeScript limitations
     const { error } = await supabase
-      .from(tableName as string)
+      .from(tableName)
       .update(data)
       .eq('id', id);
       
@@ -106,14 +103,13 @@ export async function updateSupabaseRecord<T extends keyof Tables>(
 }
 
 // Helper function to insert data into any table
-export async function insertSupabaseRecord<T extends keyof Tables>(
+export async function insertSupabaseRecord<T extends keyof Database['public']['Tables']>(
   tableName: T,
-  data: Partial<Tables[T]>
+  data: Partial<any>
 ) {
   try {
-    // Use type assertion to work around TypeScript limitations
     const { data: result, error } = await supabase
-      .from(tableName as string)
+      .from(tableName)
       .insert(data)
       .select();
       
