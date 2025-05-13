@@ -83,7 +83,8 @@ export function AppSidebar() {
       </SidebarContent>
       
       <div className="mt-auto p-4 border-t">
-        <SidebarTrigger asChild>
+        {/* Fix: Wrap the div in a React Fragment instead of using asChild prop */}
+        <SidebarTrigger>
           <div className="p-2 rounded-md hover:bg-muted flex justify-center cursor-pointer" onClick={toggleSidebar}>
             <div className={`w-5 h-5 border-t-2 border-l-2 transform transition-transform ${isCollapsed ? "rotate-135" : "-rotate-45"}`} />
           </div>

@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { Session } from "@supabase/supabase-js";
 import { AuthState, User, UserRole } from "@/types/auth";
@@ -79,7 +80,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       return {
         id: data.id,
-        email: data.email,
+        email: session?.user?.email, // Fix: Use the email from session instead of profile data
         firstName: data.first_name || "",
         lastName: data.last_name || "",
         role: (data.role as UserRole) || "employee",
