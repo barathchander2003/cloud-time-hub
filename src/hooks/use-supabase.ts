@@ -4,8 +4,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Tables } from '@/types/database';
 
+// Define valid table names to enforce type safety
+type TableNames = 'approvals' | 'documents' | 'employees' | 'leave_requests' | 'profiles' | 'timesheets' | 'users';
+
 // Custom hook for fetching data from any table with proper typing
-export function useSupabaseQuery<T extends keyof Database['public']['Tables']>(
+export function useSupabaseQuery<T extends TableNames>(
   tableName: T,
   options: {
     columns?: string;
@@ -23,13 +26,7 @@ export function useSupabaseQuery<T extends keyof Database['public']['Tables']>(
       try {
         setLoading(true);
         
-        let query = supabase.from(tableName);
-        
-        if (options.columns) {
-          query = query.select(options.columns);
-        } else {
-          query = query.select('*');
-        }
+        let query = supabase.from(tableName).select(options.columns || '*');
         
         // Apply filters if provided
         if (options.filters) {
@@ -77,7 +74,7 @@ export function useSupabaseQuery<T extends keyof Database['public']['Tables']>(
 }
 
 // Helper function to update data in any table
-export async function updateSupabaseRecord<T extends keyof Database['public']['Tables']>(
+export async function updateSupabaseRecord<T extends TableNames>(
   tableName: T,
   id: string,
   data: Partial<any>
@@ -103,7 +100,7 @@ export async function updateSupabaseRecord<T extends keyof Database['public']['T
 }
 
 // Helper function to insert data into any table
-export async function insertSupabaseRecord<T extends keyof Database['public']['Tables']>(
+export async function insertSupabaseRecord<T extends TableNames>(
   tableName: T,
   data: Partial<any>
 ) {

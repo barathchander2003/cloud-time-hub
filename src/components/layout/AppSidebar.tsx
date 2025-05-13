@@ -63,7 +63,7 @@ export function AppSidebar() {
   };
 
   return (
-    <Sidebar className={`${isCollapsed ? "w-16" : "w-64"} transition-all duration-300 md:relative fixed z-20 h-screen flex flex-col`}>
+    <Sidebar className={`${isCollapsed ? "w-16" : "w-64"} transition-all duration-300 h-screen flex flex-col`}>
       <div className="flex h-14 items-center px-4 border-b">
         <div className="flex items-center gap-2">
           {!isCollapsed && (
