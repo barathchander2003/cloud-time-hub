@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useEffect } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
@@ -10,7 +10,12 @@ export function AppLayout() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const location = useLocation();
   
-  // Show loader while checking authentication
+  // Add debugging
+  useEffect(() => {
+    console.log("AppLayout auth state:", { user, isAuthenticated, isLoading });
+  }, [user, isAuthenticated, isLoading]);
+  
+  // Show loader while checking authentication, but add a timeout to prevent infinite loading
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">

@@ -76,36 +76,55 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .eq("id", userId)
         .single();
 
-      if (error) return null;
+      if (error) {
+        console.error("Error fetching profile data:", error);
+        return null;
+      }
+
+      if (!data) {
+        console.warn("No profile data found for user:", userId);
+        return null;
+      }
 
       return {
         id: data.id,
-        email: session?.user?.email, // Fix: Use the email from session instead of profile data
+        email: session?.user?.email || "", // Use email from session
         firstName: data.first_name || "",
         lastName: data.last_name || "",
         role: (data.role as UserRole) || "employee",
         avatar: data.avatar_url,
       };
-    } catch {
+    } catch (error) {
+      console.error("Exception in fetchProfileData:", error);
       return null;
     }
   };
 
   const setUserStateFromSession = async (currentSession: Session | null) => {
     if (currentSession?.user) {
-      const userData = await fetchProfileData(currentSession.user.id);
-      const defaultUser: User = {
-        id: currentSession.user.id,
-        email: currentSession.user.email,
-        firstName: currentSession.user.user_metadata?.first_name || "",
-        lastName: currentSession.user.user_metadata?.last_name || "",
-        role: currentSession.user.user_metadata?.role || "employee",
-      };
-      setState({
-        user: userData || defaultUser,
-        isAuthenticated: true,
-        isLoading: false,
-      });
+      try {
+        const userData = await fetchProfileData(currentSession.user.id);
+        const defaultUser: User = {
+          id: currentSession.user.id,
+          email: currentSession.user.email || "",
+          firstName: currentSession.user.user_metadata?.first_name || "",
+          lastName: currentSession.user.user_metadata?.last_name || "",
+          role: currentSession.user.user_metadata?.role || "employee",
+        };
+        
+        setState({
+          user: userData || defaultUser,
+          isAuthenticated: true,
+          isLoading: false,
+        });
+      } catch (error) {
+        console.error("Error in setUserStateFromSession:", error);
+        setState({
+          user: null,
+          isAuthenticated: false,
+          isLoading: false,
+        });
+      }
     } else {
       setState({
         user: null,
@@ -116,19 +135,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
+    console.log("Setting up auth state listener");
+    
+    // Set up auth state listener first
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_, currentSession) => {
+      async (event, currentSession) => {
+        console.log("Auth state changed:", event, currentSession?.user?.email);
+        
+        // Update session state immediately
         setSession(currentSession);
-        await setUserStateFromSession(currentSession);
+        
+        // Defer profile data fetching
+        setTimeout(() => {
+          setUserStateFromSession(currentSession);
+        }, 0);
       }
     );
 
+    // Then check for existing session
     supabase.auth.getSession().then(async ({ data: { session } }) => {
+      console.log("Initial session check:", session?.user?.email);
       setSession(session);
-      await setUserStateFromSession(session);
+      
+      // Set a timeout to prevent deadlocks
+      setTimeout(() => {
+        setUserStateFromSession(session);
+      }, 0);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      console.log("Cleaning up auth state listener");
+      subscription.unsubscribe();
+    };
   }, []);
 
   const login = async (email: string, password: string) => {
@@ -146,6 +184,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error || !data.user) {
         // Fallback mock login for dev
         if (mockUsers[email.toLowerCase()] && password === "password") {
+          console.log("Using mock user:", email);
           setState({
             user: mockUsers[email.toLowerCase()],
             isAuthenticated: true,
@@ -156,21 +195,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw error || new Error("Invalid login credentials.");
       }
 
-      const userData = await fetchProfileData(data.user.id);
+      // Session is handled by the onAuthStateChange listener
+      setSession(data.session);
+      
+      // Still set the user here for immediate feedback
       const defaultUser: User = {
         id: data.user.id,
-        email: data.user.email,
+        email: data.user.email || "",
         firstName: data.user.user_metadata?.first_name || "",
         lastName: data.user.user_metadata?.last_name || "",
         role: data.user.user_metadata?.role || "employee",
       };
-
+      
       setState({
-        user: userData || defaultUser,
+        user: defaultUser,
         isAuthenticated: true,
         isLoading: false,
       });
-      setSession(data.session);
+      
+      console.log("Login successful for:", data.user.email);
     } catch (error: any) {
       console.error("Login error:", error.message);
       toast({
@@ -200,6 +243,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSession(null);
       window.location.href = "/login";
     } catch (error: any) {
+      console.error("Logout error:", error.message);
       toast({
         title: "Logout failed",
         description: error.message,
