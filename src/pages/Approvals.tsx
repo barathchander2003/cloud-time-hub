@@ -5,7 +5,6 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -24,15 +23,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Check, Clock, File, Filter, Search, X } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Check, Clock, File, Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
+import { useSupabaseQuery, updateSupabaseRecord } from "@/hooks/use-supabase";
+import { ApprovalData, formatApprovalForUI } from "@/types/database";
 
-// Sample data
-const mockRequests = [
+// Sample data as fallback
+const mockRequests: ApprovalData[] = [
   {
     id: "1",
     type: "leave",
@@ -98,68 +107,43 @@ const Approvals = () => {
   const { user } = useAuth();
   const [filter, setFilter] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState<string>("");
-  const [loading, setLoading] = useState<boolean>(true);
-  const [requests, setRequests] = useState(mockRequests);
+  const [selectedRequest, setSelectedRequest] = useState<ApprovalData | null>(null);
+  const [showDetailsDialog, setShowDetailsDialog] = useState<boolean>(false);
+  
+  // Use our custom hook to fetch approvals
+  const { data: approvalsData, loading, error } = useSupabaseQuery('approvals', {
+    orderBy: { column: 'submitted_at', ascending: false }
+  });
+  
+  const [requests, setRequests] = useState<ApprovalData[]>(mockRequests);
   
   useEffect(() => {
-    // Try to fetch real data
-    fetchRequests();
-  }, []);
-  
-  const fetchRequests = async () => {
-    try {
-      setLoading(true);
-      
-      // Try to fetch from database
-      try {
-        const { data, error } = await supabase
-          .from("approvals")
-          .select("*");
-          
-        if (error) throw error;
-        
-        if (data && data.length > 0) {
-          setRequests(data);
-        } else {
-          console.log("No approval data found, using mock data");
-          setRequests(mockRequests);
-        }
-      } catch (error) {
-        console.error("Error fetching approvals:", error);
-        setRequests(mockRequests);
-      }
-    } finally {
-      setLoading(false);
+    if (approvalsData && approvalsData.length > 0) {
+      // Map database approvals to UI format
+      const formattedApprovals = approvalsData.map(formatApprovalForUI);
+      setRequests(formattedApprovals);
     }
-  };
+  }, [approvalsData]);
   
   const handleApprove = async (id: string) => {
     try {
-      // Update status in database
-      try {
-        const { error } = await supabase
-          .from("approvals")
-          .update({ 
-            status: "approved",
-            reviewed_at: new Date().toISOString(),
-            reviewer_id: user?.id
-          })
-          .eq("id", id);
-          
-        if (error) throw error;
-      } catch (error) {
-        console.error("Error updating approval:", error);
-      }
-      
-      // Update local state
-      setRequests(requests.map(req => 
-        req.id === id ? { ...req, status: "approved" } : req
-      ));
-      
-      toast({
-        title: "Request Approved",
-        description: "The request has been approved successfully.",
+      const result = await updateSupabaseRecord('approvals', id, { 
+        status: "approved",
+        reviewed_at: new Date().toISOString(),
+        reviewer_id: user?.id
       });
+      
+      if (result.success) {
+        // Update local state
+        setRequests(requests.map(req => 
+          req.id === id ? { ...req, status: "approved" } : req
+        ));
+        
+        toast({
+          title: "Request Approved",
+          description: "The request has been approved successfully.",
+        });
+      }
     } catch (error) {
       console.error("Error approving request:", error);
       toast({
@@ -172,31 +156,23 @@ const Approvals = () => {
   
   const handleReject = async (id: string) => {
     try {
-      // Update status in database
-      try {
-        const { error } = await supabase
-          .from("approvals")
-          .update({ 
-            status: "rejected",
-            reviewed_at: new Date().toISOString(),
-            reviewer_id: user?.id
-          })
-          .eq("id", id);
-          
-        if (error) throw error;
-      } catch (error) {
-        console.error("Error updating approval:", error);
-      }
-      
-      // Update local state
-      setRequests(requests.map(req => 
-        req.id === id ? { ...req, status: "rejected" } : req
-      ));
-      
-      toast({
-        title: "Request Rejected",
-        description: "The request has been rejected.",
+      const result = await updateSupabaseRecord('approvals', id, { 
+        status: "rejected",
+        reviewed_at: new Date().toISOString(),
+        reviewer_id: user?.id
       });
+      
+      if (result.success) {
+        // Update local state
+        setRequests(requests.map(req => 
+          req.id === id ? { ...req, status: "rejected" } : req
+        ));
+        
+        toast({
+          title: "Request Rejected",
+          description: "The request has been rejected.",
+        });
+      }
     } catch (error) {
       console.error("Error rejecting request:", error);
       toast({
@@ -205,6 +181,11 @@ const Approvals = () => {
         variant: "destructive",
       });
     }
+  };
+
+  const viewDetails = (request: ApprovalData) => {
+    setSelectedRequest(request);
+    setShowDetailsDialog(true);
   };
   
   const filteredRequests = requests.filter(req => {
@@ -227,6 +208,11 @@ const Approvals = () => {
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
+  };
+  
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return "N/A";
+    return new Date(dateString).toLocaleDateString();
   };
   
   return (
@@ -286,17 +272,17 @@ const Approvals = () => {
                   <TableCell className="capitalize">{request.type}</TableCell>
                   <TableCell>{request.employee}</TableCell>
                   <TableCell className="hidden sm:table-cell">
-                    {new Date(request.submitted).toLocaleDateString()}
+                    {formatDate(request.submitted)}
                   </TableCell>
                   <TableCell className="hidden md:table-cell">
                     {request.type === "leave" ? (
                       <>
-                        {new Date(request.startDate).toLocaleDateString()} - {new Date(request.endDate).toLocaleDateString()}
+                        {formatDate(request.startDate)} - {formatDate(request.endDate)}
                       </>
                     ) : request.type === "expenses" ? (
                       <>${request.amount?.toFixed(2)}</>
                     ) : (
-                      <>{request.period}</>
+                      <>{request.period || "N/A"}</>
                     )}
                   </TableCell>
                   <TableCell>
@@ -305,7 +291,16 @@ const Approvals = () => {
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-2">
                       {request.document && (
-                        <Button size="sm" variant="outline" className="h-8 w-8 p-0">
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          className="h-8 w-8 p-0"
+                          onClick={() => {
+                            if (request.document) {
+                              window.open(request.document, '_blank');
+                            }
+                          }}
+                        >
                           <File className="h-4 w-4" />
                         </Button>
                       )}
@@ -331,11 +326,14 @@ const Approvals = () => {
                         </>
                       )}
                       
-                      {request.status !== "pending" && (
-                        <Button size="sm" variant="outline" className="h-8 px-3 py-0">
-                          Details
-                        </Button>
-                      )}
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="h-8 px-3 py-0"
+                        onClick={() => viewDetails(request)}
+                      >
+                        Details
+                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -363,6 +361,126 @@ const Approvals = () => {
           </CardContent>
         </Card>
       )}
+
+      {/* Details Dialog */}
+      <Dialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Request Details</DialogTitle>
+            <DialogDescription>
+              {selectedRequest?.type.charAt(0).toUpperCase() + selectedRequest?.type.slice(1)} request from {selectedRequest?.employee}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-3 items-center gap-4">
+              <p className="text-sm font-medium">Status:</p>
+              <div className="col-span-2">
+                {selectedRequest && getStatusBadge(selectedRequest.status)}
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-3 items-center gap-4">
+              <p className="text-sm font-medium">Submitted:</p>
+              <p className="col-span-2">{selectedRequest && formatDate(selectedRequest.submitted)}</p>
+            </div>
+            
+            {selectedRequest?.type === "leave" && (
+              <>
+                <div className="grid grid-cols-3 items-center gap-4">
+                  <p className="text-sm font-medium">Period:</p>
+                  <p className="col-span-2">
+                    {formatDate(selectedRequest?.startDate)} to {formatDate(selectedRequest?.endDate)}
+                  </p>
+                </div>
+              </>
+            )}
+            
+            {selectedRequest?.type === "expenses" && (
+              <div className="grid grid-cols-3 items-center gap-4">
+                <p className="text-sm font-medium">Amount:</p>
+                <p className="col-span-2">${selectedRequest?.amount?.toFixed(2)}</p>
+              </div>
+            )}
+            
+            {selectedRequest?.type === "timesheet" && (
+              <div className="grid grid-cols-3 items-center gap-4">
+                <p className="text-sm font-medium">Period:</p>
+                <p className="col-span-2">{selectedRequest?.period || "N/A"}</p>
+              </div>
+            )}
+            
+            <div className="grid grid-cols-3 items-center gap-4">
+              <p className="text-sm font-medium">Notes:</p>
+              <p className="col-span-2">{selectedRequest?.notes || "No notes provided"}</p>
+            </div>
+            
+            {selectedRequest?.document && (
+              <div className="grid grid-cols-3 items-center gap-4">
+                <p className="text-sm font-medium">Document:</p>
+                <div className="col-span-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => {
+                      if (selectedRequest?.document) {
+                        window.open(selectedRequest.document, '_blank');
+                      }
+                    }}
+                  >
+                    <File className="mr-2 h-4 w-4" />
+                    View Document
+                  </Button>
+                </div>
+              </div>
+            )}
+            
+            {selectedRequest?.status === "rejected" && selectedRequest?.rejectedReason && (
+              <div className="grid grid-cols-3 items-center gap-4">
+                <p className="text-sm font-medium">Reason for Rejection:</p>
+                <p className="col-span-2">{selectedRequest.rejectedReason}</p>
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter className="sm:justify-between">
+            {selectedRequest?.status === "pending" && (
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  className="text-red-600" 
+                  onClick={() => {
+                    if (selectedRequest) {
+                      handleReject(selectedRequest.id);
+                      setShowDetailsDialog(false);
+                    }
+                  }}
+                >
+                  <X className="mr-2 h-4 w-4" />
+                  Reject
+                </Button>
+                <Button 
+                  onClick={() => {
+                    if (selectedRequest) {
+                      handleApprove(selectedRequest.id);
+                      setShowDetailsDialog(false);
+                    }
+                  }}
+                >
+                  <Check className="mr-2 h-4 w-4" />
+                  Approve
+                </Button>
+              </div>
+            )}
+            <Button 
+              variant="ghost" 
+              onClick={() => setShowDetailsDialog(false)}
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

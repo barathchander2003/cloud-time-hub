@@ -9,6 +9,60 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      approvals: {
+        Row: {
+          amount: number | null
+          created_at: string | null
+          document_url: string | null
+          employee_id: string
+          employee_name: string
+          end_date: string | null
+          id: string
+          notes: string | null
+          period: string | null
+          reviewed_at: string | null
+          reviewer_id: string | null
+          start_date: string | null
+          status: string | null
+          submitted_at: string | null
+          type: string
+        }
+        Insert: {
+          amount?: number | null
+          created_at?: string | null
+          document_url?: string | null
+          employee_id: string
+          employee_name: string
+          end_date?: string | null
+          id?: string
+          notes?: string | null
+          period?: string | null
+          reviewed_at?: string | null
+          reviewer_id?: string | null
+          start_date?: string | null
+          status?: string | null
+          submitted_at?: string | null
+          type: string
+        }
+        Update: {
+          amount?: number | null
+          created_at?: string | null
+          document_url?: string | null
+          employee_id?: string
+          employee_name?: string
+          end_date?: string | null
+          id?: string
+          notes?: string | null
+          period?: string | null
+          reviewed_at?: string | null
+          reviewer_id?: string | null
+          start_date?: string | null
+          status?: string | null
+          submitted_at?: string | null
+          type?: string
+        }
+        Relationships: []
+      }
       documents: {
         Row: {
           file_name: string | null
@@ -30,6 +84,78 @@ export type Database = {
           id?: number
           uploaded_at?: string | null
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      employees: {
+        Row: {
+          client_manager: string | null
+          client_name: string | null
+          created_at: string | null
+          created_by: string | null
+          currency: string | null
+          email: string
+          employee_number: string | null
+          employment_type: string | null
+          end_date: string | null
+          first_name: string
+          id: string
+          job_role: string
+          last_name: string
+          organization: string | null
+          payment_rate: number | null
+          payment_type: string | null
+          start_date: string | null
+          status: string | null
+          updated_at: string | null
+          user_id: string | null
+          work_location: string | null
+        }
+        Insert: {
+          client_manager?: string | null
+          client_name?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          currency?: string | null
+          email: string
+          employee_number?: string | null
+          employment_type?: string | null
+          end_date?: string | null
+          first_name: string
+          id?: string
+          job_role: string
+          last_name: string
+          organization?: string | null
+          payment_rate?: number | null
+          payment_type?: string | null
+          start_date?: string | null
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+          work_location?: string | null
+        }
+        Update: {
+          client_manager?: string | null
+          client_name?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          currency?: string | null
+          email?: string
+          employee_number?: string | null
+          employment_type?: string | null
+          end_date?: string | null
+          first_name?: string
+          id?: string
+          job_role?: string
+          last_name?: string
+          organization?: string | null
+          payment_rate?: number | null
+          payment_type?: string | null
+          start_date?: string | null
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+          work_location?: string | null
         }
         Relationships: []
       }

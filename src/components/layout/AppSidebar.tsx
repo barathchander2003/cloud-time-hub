@@ -7,19 +7,19 @@ import {
   ClipboardCheck,
   FileText,
   Home,
+  LogOut,
   Settings,
   Users 
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { Button } from "@/components/ui/button";
 
 export function AppSidebar() {
   const { state: sidebarState, toggleSidebar } = useSidebar();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const location = useLocation();
   
   const isCollapsed = sidebarState === "collapsed";
-  
-  const isActive = (path: string) => location.pathname === path;
   
   const navItems = [
     { 
@@ -54,8 +54,16 @@ export function AppSidebar() {
     },
   ];
 
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
+  };
+
   return (
-    <Sidebar className={`${isCollapsed ? "w-16" : "w-64"} transition-all duration-300 md:relative absolute z-20 h-screen`}>
+    <Sidebar className={`${isCollapsed ? "w-16" : "w-64"} transition-all duration-300 md:relative fixed z-20 h-screen`}>
       <div className="flex h-14 items-center px-4 border-b">
         <div className="flex items-center gap-2">
           {!isCollapsed && (
@@ -64,7 +72,7 @@ export function AppSidebar() {
         </div>
       </div>
       
-      <SidebarContent className="p-2">
+      <SidebarContent className="p-2 flex flex-col h-[calc(100%-8rem)]">
         <nav className="flex flex-col gap-1">
           {navItems.map((item) => (
             <NavLink
@@ -82,9 +90,17 @@ export function AppSidebar() {
         </nav>
       </SidebarContent>
       
-      <div className="mt-auto p-4 border-t">
+      <div className="absolute bottom-0 w-full p-4 border-t">
+        <Button 
+          variant="ghost" 
+          className="w-full flex justify-center items-center gap-2" 
+          onClick={handleLogout}
+        >
+          <LogOut className="h-5 w-5" />
+          {!isCollapsed && <span>Logout</span>}
+        </Button>
         <div 
-          className="p-2 rounded-md hover:bg-muted flex justify-center cursor-pointer"
+          className="p-2 mt-2 rounded-md hover:bg-muted flex justify-center cursor-pointer"
           onClick={toggleSidebar}
         >
           <div className={`w-5 h-5 border-t-2 border-l-2 transform transition-transform ${isCollapsed ? "rotate-135" : "-rotate-45"}`} />
