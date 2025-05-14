@@ -14,11 +14,9 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
-import { useMobile } from "@/hooks/use-mobile";
 
 const AppSidebar = () => {
   const { logout } = useAuth();
-  const { isMobile, isSidebarOpen, toggleSidebar } = useMobile();
   
   const handleLogout = async () => {
     try {
@@ -27,19 +25,9 @@ const AppSidebar = () => {
       console.error("Logout error:", error);
     }
   };
-  
-  if (isMobile && !isSidebarOpen) {
-    return null;
-  }
 
   return (
-    <aside
-      className={cn(
-        "bg-card text-card-foreground h-screen border-r flex flex-col",
-        isSidebarOpen ? "w-64" : "w-0",
-        isMobile ? "fixed z-50" : "relative"
-      )}
-    >
+    <aside className="bg-card text-card-foreground h-screen border-r flex flex-col w-64 fixed lg:relative z-40">
       <div className="flex items-center h-16 px-6 border-b">
         <h1 className="text-xl font-bold tracking-tight">HRMS</h1>
       </div>

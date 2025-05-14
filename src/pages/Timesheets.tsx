@@ -32,7 +32,7 @@ const Timesheets = () => {
   const firstDay = `${year}-${month.toString().padStart(2, '0')}-01`;
   const lastDay = `${year}-${month.toString().padStart(2, '0')}-${new Date(year, month, 0).getDate().toString().padStart(2, '0')}`;
   
-  const { data: timesheetData, loading: isLoading, error } = useSupabaseQuery('timesheets', {
+  const { data: timesheetData, loading: isLoading, error, refetch } = useSupabaseQuery('timesheets', {
     filters: {
       user_id: user?.id,
     },
@@ -77,12 +77,12 @@ const Timesheets = () => {
         }
         
         // Update the entries map with data from Supabase
-        const currentMonthData = timesheetData.filter(entry => {
+        const currentMonthData = timesheetData.filter((entry: any) => {
           const entryDate = entry.date;
           return entryDate >= firstDay && entryDate <= lastDay;
         });
         
-        currentMonthData.forEach((entry) => {
+        currentMonthData.forEach((entry: any) => {
           const type = entry.hours_worked === 0 ? "leave" : "work";
           entriesMap[entry.date] = { 
             hours: entry.hours_worked, 
@@ -94,7 +94,7 @@ const Timesheets = () => {
         setEntries(entriesMap);
         
         // Determine status from data
-        const statusSet = new Set(currentMonthData.map(entry => entry.status));
+        const statusSet = new Set(currentMonthData.map((entry: any) => entry.status));
         if (statusSet.has('Approved')) {
           setStatus('approved');
         } else if (statusSet.has('Rejected')) {
@@ -160,6 +160,9 @@ const Timesheets = () => {
         title: "Entry saved",
         description: "Your timesheet entry has been saved"
       });
+      
+      // Refresh data
+      refetch();
     } catch (error) {
       console.error('Error saving timesheet entry:', error);
       toast({
@@ -250,6 +253,9 @@ const Timesheets = () => {
         title: "Timesheet submitted",
         description: "Your timesheet has been submitted for approval"
       });
+      
+      // Refresh data
+      refetch();
     } catch (error) {
       console.error('Error submitting timesheet:', error);
       toast({
@@ -265,23 +271,17 @@ const Timesheets = () => {
   const workDays = Object.values(entries).filter(entry => entry.hours > 0 && entry.type === "work").length;
   const leaveDays = Object.values(entries).filter(entry => entry.type === "leave").length;
 
-  // For debugging
-  useEffect(() => {
-    console.log("Current entries:", entries);
-    console.log("Total calculated hours:", totalHours);
-  }, [entries]);
-
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="space-y-6 max-w-full pb-10">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">My Timesheet</h1>
           <p className="text-muted-foreground">
             Manage and submit your monthly timesheet
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <LeaveRequest onRequestSubmitted={() => {}} />
+        <div className="flex flex-wrap items-center gap-2">
+          <LeaveRequest onRequestSubmitted={() => refetch()} />
           <Button variant="outline" onClick={handleSaveDraft}>
             <Save className="mr-2 h-4 w-4" />
             Save Draft
@@ -290,7 +290,7 @@ const Timesheets = () => {
             <Download className="mr-2 h-4 w-4" />
             Export
           </Button>
-          <Button onClick={handleSubmit}>
+          <Button onClick={handleSubmit} disabled={status === "submitted" || status === "approved"}>
             <Send className="mr-2 h-4 w-4" />
             Submit
           </Button>
@@ -299,7 +299,7 @@ const Timesheets = () => {
       
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="md:col-span-3">
-          <CardHeader className="flex flex-row items-center justify-between">
+          <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
               <CardTitle>Monthly Timesheet</CardTitle>
               <CardDescription>
@@ -349,7 +349,7 @@ const Timesheets = () => {
         </Card>
         
         <div className="space-y-4">
-          <Card>
+          <Card className="bg-white border">
             <CardHeader>
               <CardTitle>Summary</CardTitle>
               <CardDescription>
@@ -358,33 +358,48 @@ const Timesheets = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Hours</p>
-                  <p className="text-2xl font-bold">{totalHours}</p>
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <p className="text-sm text-gray-600">Total Hours</p>
+                  <p className="text-2xl font-bold text-primary">{totalHours}</p>
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Work Days</p>
-                  <p className="text-2xl font-bold">{workDays}</p>
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <p className="text-sm text-gray-600">Work Days</p>
+                  <p className="text-2xl font-bold text-green-600">{workDays}</p>
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Leave Days</p>
-                  <p className="text-2xl font-bold">{leaveDays}</p>
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <p className="text-sm text-gray-600">Leave Days</p>
+                  <p className="text-2xl font-bold text-orange-500">{leaveDays}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
           
-          <Card>
+          <Card className="bg-white border">
             <CardHeader>
               <CardTitle>Instructions</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4 text-sm">
-                <p><strong>1.</strong> Click on any day in the calendar to add or edit time entries</p>
-                <p><strong>2.</strong> Enter hours worked or select leave type</p>
-                <p><strong>3.</strong> Save your draft regularly</p>
-                <p><strong>4.</strong> Submit your timesheet at the end of the month</p>
-                <p><strong>5.</strong> Use the Request Leave button for leave applications</p>
+                <div className="flex gap-2">
+                  <span className="flex-none bg-primary text-white w-6 h-6 rounded-full flex items-center justify-center text-xs">1</span>
+                  <p>Click on any day in the calendar to add or edit time entries</p>
+                </div>
+                <div className="flex gap-2">
+                  <span className="flex-none bg-primary text-white w-6 h-6 rounded-full flex items-center justify-center text-xs">2</span>
+                  <p>Enter hours worked or select leave type</p>
+                </div>
+                <div className="flex gap-2">
+                  <span className="flex-none bg-primary text-white w-6 h-6 rounded-full flex items-center justify-center text-xs">3</span>
+                  <p>Save your draft regularly</p>
+                </div>
+                <div className="flex gap-2">
+                  <span className="flex-none bg-primary text-white w-6 h-6 rounded-full flex items-center justify-center text-xs">4</span>
+                  <p>Submit your timesheet at the end of the month</p>
+                </div>
+                <div className="flex gap-2">
+                  <span className="flex-none bg-primary text-white w-6 h-6 rounded-full flex items-center justify-center text-xs">5</span>
+                  <p>Use the Request Leave button for leave applications</p>
+                </div>
               </div>
             </CardContent>
           </Card>

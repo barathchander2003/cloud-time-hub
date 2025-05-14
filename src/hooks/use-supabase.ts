@@ -2,8 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { Database } from '@/integrations/supabase/types';
-import { Tables, formatApprovalForUI, formatEmployeeForUI } from '@/types/database';
+import { Tables } from '@/types/database';
 
 // Define valid table names to enforce type safety
 type TableNames = 'approvals' | 'documents' | 'employees' | 'leave_requests' | 'profiles' | 'timesheets' | 'users';
@@ -53,13 +52,11 @@ export function useSupabaseQuery<T extends TableNames>(
       
       if (error) throw error;
       
-      // Format the data based on table type
-      if (tableName === 'approvals' && result) {
-        setData(result.map((item) => formatApprovalForUI(item as Tables<'approvals'>)));
-      } else if (tableName === 'employees' && result) {
-        setData(result.map((item) => formatEmployeeForUI(item as Tables<'employees'>)));
+      // Process the data safely
+      if (result) {
+        setData(result);
       } else {
-        setData(result || []);
+        setData([]);
       }
     } catch (err: any) {
       setError(err);
@@ -86,9 +83,9 @@ export function useSupabaseQuery<T extends TableNames>(
   };
 }
 
-// Helper function to update data in any table with proper typing
-export async function updateSupabaseRecord<T extends TableNames>(
-  tableName: T,
+// Helper function to update data in any table
+export async function updateSupabaseRecord(
+  tableName: TableNames,
   id: string,
   data: Record<string, any>
 ) {
@@ -112,9 +109,9 @@ export async function updateSupabaseRecord<T extends TableNames>(
   }
 }
 
-// Helper function to insert data into any table with proper typing
-export async function insertSupabaseRecord<T extends TableNames>(
-  tableName: T,
+// Helper function to insert data into any table
+export async function insertSupabaseRecord(
+  tableName: TableNames,
   data: Record<string, any>
 ) {
   try {
