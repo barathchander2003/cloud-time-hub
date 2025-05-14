@@ -1,59 +1,25 @@
 
 import React from "react";
-import { NavLink, useLocation } from "react-router-dom";
-import { useSidebar, Sidebar, SidebarContent, SidebarTrigger } from "@/components/ui/sidebar";
-import { 
-  BarChart3,
-  ClipboardCheck,
-  FileText,
-  Home,
-  LogOut,
-  Settings,
-  Users 
-} from "lucide-react";
-import { useAuth } from "@/context/AuthContext";
+import { NavLink } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import {
+  Calendar,
+  ClipboardList,
+  Home,
+  Settings,
+  Users,
+  FileCheck,
+  BarChart3,
+  LogOut,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useAuth } from "@/context/AuthContext";
+import { useMobile } from "@/hooks/use-mobile";
 
-export function AppSidebar() {
-  const { state: sidebarState, toggleSidebar } = useSidebar();
-  const { user, logout } = useAuth();
-  const location = useLocation();
+const AppSidebar = () => {
+  const { logout } = useAuth();
+  const { isMobile, isSidebarOpen, toggleSidebar } = useMobile();
   
-  const isCollapsed = sidebarState === "collapsed";
-  
-  const navItems = [
-    { 
-      label: "Dashboard", 
-      icon: <Home className="h-5 w-5" />,
-      href: "/dashboard" 
-    },
-    { 
-      label: "Employees", 
-      icon: <Users className="h-5 w-5" />, 
-      href: "/employees" 
-    },
-    { 
-      label: "Timesheets", 
-      icon: <FileText className="h-5 w-5" />, 
-      href: "/timesheets"
-    },
-    { 
-      label: "Approvals", 
-      icon: <ClipboardCheck className="h-5 w-5" />, 
-      href: "/approvals"
-    },
-    { 
-      label: "Reports", 
-      icon: <BarChart3 className="h-5 w-5" />, 
-      href: "/reports"
-    },
-    { 
-      label: "Settings", 
-      icon: <Settings className="h-5 w-5" />, 
-      href: "/settings"
-    },
-  ];
-
   const handleLogout = async () => {
     try {
       await logout();
@@ -61,51 +27,111 @@ export function AppSidebar() {
       console.error("Logout error:", error);
     }
   };
+  
+  if (isMobile && !isSidebarOpen) {
+    return null;
+  }
 
   return (
-    <Sidebar className="h-screen flex flex-col">
-      <div className="flex h-14 items-center px-4 border-b">
-        <div className="flex items-center gap-2">
-          {!isCollapsed && (
-            <span className="text-xl font-bold">TimeTrack</span>
-          )}
-        </div>
+    <aside
+      className={cn(
+        "bg-card text-card-foreground h-screen border-r flex flex-col",
+        isSidebarOpen ? "w-64" : "w-0",
+        isMobile ? "fixed z-50" : "relative"
+      )}
+    >
+      <div className="flex items-center h-16 px-6 border-b">
+        <h1 className="text-xl font-bold tracking-tight">HRMS</h1>
       </div>
-      
-      <SidebarContent className="p-2 flex flex-col flex-1">
-        <nav className="flex flex-col gap-1">
-          {navItems.map((item) => (
-            <NavLink
-              key={item.href}
-              to={item.href}
-              className={({ isActive }) => `
-                flex items-center gap-3 px-3 py-2 rounded-md transition-colors
-                ${isActive ? "bg-primary/10 text-primary" : "hover:bg-muted"}
-              `}
-            >
-              {item.icon}
-              {!isCollapsed && <span>{item.label}</span>}
-            </NavLink>
-          ))}
-        </nav>
-      </SidebarContent>
-      
+      <nav className="flex-1 overflow-y-auto py-4 px-2">
+        <div className="space-y-1">
+          <NavLink to="/" end>
+            {({ isActive }) => (
+              <Button
+                variant={isActive ? "default" : "ghost"}
+                size="lg"
+                className={cn("w-full justify-start", isActive && "bg-primary text-primary-foreground")}
+              >
+                <Home className="mr-3 h-5 w-5" />
+                Dashboard
+              </Button>
+            )}
+          </NavLink>
+          <NavLink to="/timesheets">
+            {({ isActive }) => (
+              <Button
+                variant={isActive ? "default" : "ghost"}
+                size="lg"
+                className={cn("w-full justify-start", isActive && "bg-primary text-primary-foreground")}
+              >
+                <Calendar className="mr-3 h-5 w-5" />
+                Timesheets
+              </Button>
+            )}
+          </NavLink>
+          <NavLink to="/approvals">
+            {({ isActive }) => (
+              <Button
+                variant={isActive ? "default" : "ghost"}
+                size="lg"
+                className={cn("w-full justify-start", isActive && "bg-primary text-primary-foreground")}
+              >
+                <FileCheck className="mr-3 h-5 w-5" />
+                Approvals
+              </Button>
+            )}
+          </NavLink>
+          <NavLink to="/employees">
+            {({ isActive }) => (
+              <Button
+                variant={isActive ? "default" : "ghost"}
+                size="lg"
+                className={cn("w-full justify-start", isActive && "bg-primary text-primary-foreground")}
+              >
+                <Users className="mr-3 h-5 w-5" />
+                Employees
+              </Button>
+            )}
+          </NavLink>
+          <NavLink to="/reports">
+            {({ isActive }) => (
+              <Button
+                variant={isActive ? "default" : "ghost"}
+                size="lg"
+                className={cn("w-full justify-start", isActive && "bg-primary text-primary-foreground")}
+              >
+                <BarChart3 className="mr-3 h-5 w-5" />
+                Reports
+              </Button>
+            )}
+          </NavLink>
+          <NavLink to="/settings">
+            {({ isActive }) => (
+              <Button
+                variant={isActive ? "default" : "ghost"}
+                size="lg"
+                className={cn("w-full justify-start", isActive && "bg-primary text-primary-foreground")}
+              >
+                <Settings className="mr-3 h-5 w-5" />
+                Settings
+              </Button>
+            )}
+          </NavLink>
+        </div>
+      </nav>
       <div className="p-4 border-t">
-        <Button 
-          variant="ghost" 
-          className="w-full flex justify-center items-center gap-2" 
+        <Button
+          variant="outline"
+          size="lg"
+          className="w-full justify-start"
           onClick={handleLogout}
         >
-          <LogOut className="h-5 w-5" />
-          {!isCollapsed && <span>Logout</span>}
+          <LogOut className="mr-3 h-5 w-5" />
+          Log out
         </Button>
-        <div 
-          className="p-2 mt-2 rounded-md hover:bg-muted flex justify-center cursor-pointer"
-          onClick={toggleSidebar}
-        >
-          <div className={`w-5 h-5 border-t-2 border-l-2 transform transition-transform ${isCollapsed ? "rotate-135" : "-rotate-45"}`} />
-        </div>
       </div>
-    </Sidebar>
+    </aside>
   );
-}
+};
+
+export default AppSidebar;

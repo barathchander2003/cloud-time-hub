@@ -36,9 +36,9 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
-import { ApprovalData, formatApprovalForUI, Tables } from "@/types/database";
+import { ApprovalData } from "@/types/database";
 import { downloadFile } from "@/services/storage-service";
+import { useSupabaseQuery, updateSupabaseRecord } from "@/hooks/use-supabase";
 
 // Sample data as fallback
 const mockRequests: ApprovalData[] = [
@@ -109,65 +109,26 @@ const Approvals = () => {
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [selectedRequest, setSelectedRequest] = useState<ApprovalData | null>(null);
   const [showDetailsDialog, setShowDetailsDialog] = useState<boolean>(false);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [requests, setRequests] = useState<ApprovalData[]>(mockRequests);
   
-  useEffect(() => {
-    fetchApprovals();
-  }, [filter]);
-  
-  const fetchApprovals = async () => {
-    try {
-      setLoading(true);
-      
-      const { data, error } = await supabase
-        .from('approvals')
-        .select('*')
-        .order('submitted_at', { ascending: false });
-      
-      if (error) throw error;
-      
-      if (data && data.length > 0) {
-        // Map database approvals to UI format
-        const formattedApprovals = data.map((approval: Tables<'approvals'>) => 
-          formatApprovalForUI(approval)
-        );
-        setRequests(formattedApprovals);
-      }
-    } catch (error: any) {
-      console.error("Error fetching approvals:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load approval requests",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: requests, loading, error, refetch } = useSupabaseQuery('approvals', {
+    orderBy: { column: 'submitted_at', ascending: false }
+  });
   
   const handleApprove = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('approvals')
-        .update({ 
-          status: "approved",
-          reviewed_at: new Date().toISOString(),
-          reviewer_id: user?.id
-        })
-        .eq('id', id);
-      
-      if (error) throw error;
-      
-      // Update local state
-      setRequests(requests.map(req => 
-        req.id === id ? { ...req, status: "approved" } : req
-      ));
-      
-      toast({
-        title: "Request Approved",
-        description: "The request has been approved successfully.",
+      const result = await updateSupabaseRecord('approvals', id, { 
+        status: "approved",
+        reviewed_at: new Date().toISOString(),
+        reviewer_id: user?.id
       });
+      
+      if (result.success) {
+        toast({
+          title: "Request Approved",
+          description: "The request has been approved successfully.",
+        });
+        refetch();
+      }
     } catch (error: any) {
       console.error("Error approving request:", error);
       toast({
@@ -180,26 +141,19 @@ const Approvals = () => {
   
   const handleReject = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('approvals')
-        .update({ 
-          status: "rejected",
-          reviewed_at: new Date().toISOString(),
-          reviewer_id: user?.id
-        })
-        .eq('id', id);
-      
-      if (error) throw error;
-      
-      // Update local state
-      setRequests(requests.map(req => 
-        req.id === id ? { ...req, status: "rejected" } : req
-      ));
-      
-      toast({
-        title: "Request Rejected",
-        description: "The request has been rejected.",
+      const result = await updateSupabaseRecord('approvals', id, { 
+        status: "rejected",
+        reviewed_at: new Date().toISOString(),
+        reviewer_id: user?.id
       });
+      
+      if (result.success) {
+        toast({
+          title: "Request Rejected",
+          description: "The request has been rejected.",
+        });
+        refetch();
+      }
     } catch (error: any) {
       console.error("Error rejecting request:", error);
       toast({
@@ -248,14 +202,14 @@ const Approvals = () => {
     }
   };
   
-  const filteredRequests = requests.filter(req => {
+  const filteredRequests = requests?.filter(req => {
     const matchesFilter = filter === "all" || req.status === filter;
     const matchesSearch = 
       req.employee?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       req.type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (req.notes && req.notes.toLowerCase().includes(searchTerm.toLowerCase()));
     return matchesFilter && matchesSearch;
-  });
+  }) || [];
   
   const getStatusBadge = (status: string) => {
     switch (status) {

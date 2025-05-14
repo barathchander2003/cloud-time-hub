@@ -1,8 +1,9 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { Tables } from '@/types/database';
+import { Database } from '@/integrations/supabase/types';
+import { Tables, formatApprovalForUI, formatEmployeeForUI } from '@/types/database';
 
 // Define valid table names to enforce type safety
 type TableNames = 'approvals' | 'documents' | 'employees' | 'leave_requests' | 'profiles' | 'timesheets' | 'users';
@@ -21,63 +22,75 @@ export function useSupabaseQuery<T extends TableNames>(
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        
-        let query = supabase.from(tableName).select(options.columns || '*');
-        
-        // Apply filters if provided
-        if (options.filters) {
-          Object.entries(options.filters).forEach(([key, value]) => {
-            if (value !== undefined && value !== null && value !== '') {
-              query = query.eq(key, value);
-            }
-          });
-        }
-        
-        // Apply ordering if provided
-        if (options.orderBy) {
-          query = query.order(options.orderBy.column, { 
-            ascending: options.orderBy.ascending 
-          });
-        }
-        
-        // Apply limit if provided
-        if (options.limit) {
-          query = query.limit(options.limit);
-        }
-        
-        const { data: result, error } = await query;
-        
-        if (error) throw error;
-        
-        setData(result || []);
-      } catch (err: any) {
-        setError(err);
-        console.error(`Error fetching ${String(tableName)}:`, err);
-        toast({
-          title: "Error",
-          description: `Failed to load ${String(tableName)}: ${err.message}`,
-          variant: "destructive",
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true);
+      
+      let query = supabase.from(tableName).select(options.columns || '*');
+      
+      // Apply filters if provided
+      if (options.filters) {
+        Object.entries(options.filters).forEach(([key, value]) => {
+          if (value !== undefined && value !== null && value !== '') {
+            query = query.eq(key, value);
+          }
         });
-      } finally {
-        setLoading(false);
       }
-    };
-    
-    fetchData();
+      
+      // Apply ordering if provided
+      if (options.orderBy) {
+        query = query.order(options.orderBy.column, { 
+          ascending: options.orderBy.ascending 
+        });
+      }
+      
+      // Apply limit if provided
+      if (options.limit) {
+        query = query.limit(options.limit);
+      }
+      
+      const { data: result, error } = await query;
+      
+      if (error) throw error;
+      
+      // Format the data based on table type
+      if (tableName === 'approvals' && result) {
+        setData(result.map((item) => formatApprovalForUI(item as Tables<'approvals'>)));
+      } else if (tableName === 'employees' && result) {
+        setData(result.map((item) => formatEmployeeForUI(item as Tables<'employees'>)));
+      } else {
+        setData(result || []);
+      }
+    } catch (err: any) {
+      setError(err);
+      console.error(`Error fetching ${String(tableName)}:`, err);
+      toast({
+        title: "Error",
+        description: `Failed to load ${String(tableName)}: ${err.message}`,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   }, [tableName, JSON.stringify(options)]);
   
-  return { data, loading, error, refetch: () => {} };
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+  
+  return { 
+    data, 
+    loading, 
+    error, 
+    refetch: fetchData 
+  };
 }
 
-// Helper function to update data in any table
+// Helper function to update data in any table with proper typing
 export async function updateSupabaseRecord<T extends TableNames>(
   tableName: T,
   id: string,
-  data: Partial<Record<string, any>>
+  data: Record<string, any>
 ) {
   try {
     const { error } = await supabase
@@ -99,10 +112,10 @@ export async function updateSupabaseRecord<T extends TableNames>(
   }
 }
 
-// Helper function to insert data into any table
+// Helper function to insert data into any table with proper typing
 export async function insertSupabaseRecord<T extends TableNames>(
   tableName: T,
-  data: Partial<Record<string, any>>
+  data: Record<string, any>
 ) {
   try {
     const { data: result, error } = await supabase

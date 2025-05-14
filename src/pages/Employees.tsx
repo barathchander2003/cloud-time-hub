@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { 
@@ -48,10 +47,10 @@ import {
   Upload, 
   User
 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Employee } from "@/types/employee";
 import { useAuth } from "@/context/AuthContext";
+import { useSupabaseQuery, insertSupabaseRecord } from "@/hooks/use-supabase";
+import { supabase } from "@/integrations/supabase/client";
 
 // Use available employee data
 const mockEmployees = [
@@ -105,8 +104,6 @@ const mockEmployees = [
 const Employees = () => {
   const { user } = useAuth();
   const [showAddDialog, setShowAddDialog] = useState(false);
-  const [employees, setEmployees] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [formData, setFormData] = useState({
     firstName: "",
@@ -128,35 +125,7 @@ const Employees = () => {
   const [uploading, setUploading] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   
-  useEffect(() => {
-    fetchEmployees();
-  }, []);
-  
-  const fetchEmployees = async () => {
-    try {
-      setLoading(true);
-      // Try to fetch from Supabase, fall back to mock data
-      try {
-        const { data, error } = await supabase
-          .from("employees")
-          .select("*");
-          
-        if (error) throw error;
-        
-        if (data && data.length > 0) {
-          setEmployees(data);
-        } else {
-          console.log("No employee data found in DB, using mock data");
-          setEmployees(mockEmployees);
-        }
-      } catch (error) {
-        console.error("Error fetching employees:", error);
-        setEmployees(mockEmployees);
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: employees, loading, refetch } = useSupabaseQuery('employees');
   
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
@@ -212,26 +181,32 @@ const Employees = () => {
         created_by: user?.id
       };
       
-      // Try to insert into Supabase
-      try {
-        const { data, error } = await supabase
-          .from("employees")
-          .insert(employeeData)
-          .select();
-          
-        if (error) throw error;
-        
+      // Insert into Supabase
+      const result = await insertSupabaseRecord('employees', employeeData);
+      
+      if (result.success) {
         // Upload document if selected
         if (file) {
           const fileExt = file.name.split('.').pop();
           const fileName = `${Date.now()}-${formData.firstName}-${formData.lastName}.${fileExt}`;
           
-          const { error: uploadError } = await supabase
-            .storage
-            .from('employee-documents')
-            .upload(fileName, file);
-            
-          if (uploadError) throw uploadError;
+          try {
+            const { error: uploadError } = await supabase
+              .storage
+              .from('employee-documents')
+              .upload(fileName, file);
+              
+            if (uploadError) {
+              console.error("Document upload error:", uploadError);
+              toast({
+                title: "Warning",
+                description: "Employee added but document failed to upload.",
+                variant: "destructive"
+              });
+            }
+          } catch (uploadErr) {
+            console.error("Document upload exception:", uploadErr);
+          }
         }
         
         toast({
@@ -240,48 +215,7 @@ const Employees = () => {
         });
         
         // Refresh employee list
-        fetchEmployees();
-        
-        // Reset form and close dialog
-        setFormData({
-          firstName: "",
-          lastName: "",
-          email: "",
-          jobRole: "",
-          organization: "",
-          employmentType: "",
-          paymentType: "",
-          rate: "",
-          currency: "",
-          client: "",
-          clientManager: "",
-          employeeNumber: "",
-          workLocation: "",
-          startDate: "",
-          endDate: ""
-        });
-        setFile(null);
-        setShowAddDialog(false);
-      } catch (error) {
-        console.error("Error saving employee:", error);
-        
-        // For demo purposes, simulate success with mock data
-        const newEmployee = {
-          id: String(Date.now()),
-          name: `${formData.firstName} ${formData.lastName}`,
-          email: formData.email,
-          role: formData.jobRole,
-          organization: formData.organization || "Market Cloud Ltd",
-          employmentType: formData.employmentType || "fulltime",
-          status: "active"
-        };
-        
-        setEmployees([...employees, newEmployee]);
-        
-        toast({
-          title: "Success",
-          description: "Employee added successfully (mock data)!",
-        });
+        refetch();
         
         // Reset form and close dialog
         setFormData({
@@ -304,7 +238,7 @@ const Employees = () => {
         setFile(null);
         setShowAddDialog(false);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error in handleSubmit:", error);
       toast({
         title: "Error",
@@ -351,12 +285,12 @@ const Employees = () => {
     }
   };
   
-  const filteredEmployees = employees.filter(emp => 
+  const filteredEmployees = employees?.filter(emp => 
     emp.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     emp.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     emp.role?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     emp.organization?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  ) || [];
   
   return (
     <div className="space-y-6">
