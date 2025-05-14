@@ -77,7 +77,7 @@ export function useSupabaseQuery<T extends TableNames>(
 export async function updateSupabaseRecord<T extends TableNames>(
   tableName: T,
   id: string,
-  data: Partial<any>
+  data: Partial<Record<string, any>>
 ) {
   try {
     const { error } = await supabase
@@ -102,7 +102,7 @@ export async function updateSupabaseRecord<T extends TableNames>(
 // Helper function to insert data into any table
 export async function insertSupabaseRecord<T extends TableNames>(
   tableName: T,
-  data: Partial<any>
+  data: Partial<Record<string, any>>
 ) {
   try {
     const { data: result, error } = await supabase

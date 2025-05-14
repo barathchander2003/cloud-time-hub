@@ -16,39 +16,49 @@ import { ChevronLeft, ChevronRight, Download, Save, Send } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
+import { useSupabaseQuery, updateSupabaseRecord, insertSupabaseRecord } from "@/hooks/use-supabase";
 
 const Timesheets = () => {
   const { user } = useAuth();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [entries, setEntries] = useState<Record<string, { hours: number; type: string; note?: string }>>({});
   const [status, setStatus] = useState<"draft" | "submitted" | "approved" | "rejected">("draft");
-  const [isLoading, setIsLoading] = useState(true);
   
-  // Fetch timesheet entries from Supabase
+  // Get the month and year for filtering
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth() + 1; // JavaScript months are 0-indexed
+  
+  // Calculate the first and last day of the month
+  const firstDay = `${year}-${month.toString().padStart(2, '0')}-01`;
+  const lastDay = `${year}-${month.toString().padStart(2, '0')}-${new Date(year, month, 0).getDate().toString().padStart(2, '0')}`;
+  
+  const { data: timesheetData, loading: isLoading, error } = useSupabaseQuery('timesheets', {
+    filters: {
+      user_id: user?.id,
+    },
+    orderBy: {
+      column: 'date',
+      ascending: true,
+    },
+  });
+
   useEffect(() => {
-    if (!user) return;
-    
-    const fetchEntries = async () => {
-      setIsLoading(true);
-      
-      // Get the month and year for filtering
-      const year = currentDate.getFullYear();
-      const month = currentDate.getMonth() + 1; // JavaScript months are 0-indexed
-      
-      // Calculate the first and last day of the month
-      const firstDay = `${year}-${month.toString().padStart(2, '0')}-01`;
-      const lastDay = `${year}-${month.toString().padStart(2, '0')}-${new Date(year, month, 0).getDate().toString().padStart(2, '0')}`;
+    if (error) {
+      console.error('Error in useSupabaseQuery:', error);
+      toast({
+        title: "Failed to fetch data",
+        description: "Could not load your timesheet entries. Please try again.",
+        variant: "destructive"
+      });
+    }
+  }, [error]);
+
+  // Process timesheet data when it's loaded
+  useEffect(() => {
+    if (!isLoading && timesheetData && user) {
+      console.log("Loaded timesheet data:", timesheetData);
       
       try {
-        const { data, error } = await supabase
-          .from('timesheets')
-          .select('*')
-          .eq('user_id', user.id)
-          .gte('date', firstDay)
-          .lte('date', lastDay);
-          
-        if (error) throw error;
-        
         const entriesMap: Record<string, { hours: number; type: string; note?: string }> = {};
         
         // Initialize the entries map with default values for the entire month
@@ -67,32 +77,44 @@ const Timesheets = () => {
         }
         
         // Update the entries map with data from Supabase
-        if (data) {
-          data.forEach((entry) => {
-            const type = entry.hours_worked === 0 ? "leave" : "work";
-            entriesMap[entry.date] = { 
-              hours: entry.hours_worked, 
-              type: type,
-              note: entry.description
-            };
-          });
-        }
+        const currentMonthData = timesheetData.filter(entry => {
+          const entryDate = entry.date;
+          return entryDate >= firstDay && entryDate <= lastDay;
+        });
+        
+        currentMonthData.forEach((entry) => {
+          const type = entry.hours_worked === 0 ? "leave" : "work";
+          entriesMap[entry.date] = { 
+            hours: entry.hours_worked, 
+            type: type,
+            note: entry.description
+          };
+        });
         
         setEntries(entriesMap);
+        
+        // Determine status from data
+        const statusSet = new Set(currentMonthData.map(entry => entry.status));
+        if (statusSet.has('Approved')) {
+          setStatus('approved');
+        } else if (statusSet.has('Rejected')) {
+          setStatus('rejected');
+        } else if (statusSet.has('Pending')) {
+          setStatus('submitted');
+        } else {
+          setStatus('draft');
+        }
+        
       } catch (error) {
-        console.error('Error fetching timesheet entries:', error);
+        console.error('Error processing timesheet data:', error);
         toast({
-          title: "Failed to fetch data",
-          description: "Could not load your timesheet entries. Please try again.",
+          title: "Failed to process data",
+          description: "Could not process your timesheet entries. Please try again.",
           variant: "destructive"
         });
-      } finally {
-        setIsLoading(false);
       }
-    };
-    
-    fetchEntries();
-  }, [user, currentDate]);
+    }
+  }, [isLoading, timesheetData, user, year, month, firstDay, lastDay]);
 
   const handlePrevMonth = () => {
     setCurrentDate(subMonths(currentDate, 1));
@@ -103,44 +125,35 @@ const Timesheets = () => {
   };
 
   const handleEntryUpdate = async (date: string, entry: { hours: number; type: string; note?: string }) => {
-    // Update locally first for immediate UI feedback
-    setEntries((prev) => ({ ...prev, [date]: entry }));
+    if (!user) return;
     
-    // Then save to Supabase
+    // Update locally first for immediate UI feedback
+    setEntries(prev => ({ ...prev, [date]: entry }));
+    
     try {
       // Check if an entry already exists for this date
       const { data: existingEntries } = await supabase
         .from('timesheets')
         .select('*')
-        .eq('user_id', user?.id)
-        .eq('date', date)
-        .single();
+        .eq('user_id', user.id)
+        .eq('date', date);
         
-      if (existingEntries) {
+      if (existingEntries && existingEntries.length > 0) {
         // Update existing entry
-        const { error } = await supabase
-          .from('timesheets')
-          .update({
-            hours_worked: entry.hours,
-            description: entry.note
-          })
-          .eq('user_id', user?.id)
-          .eq('date', date);
-          
-        if (error) throw error;
+        await updateSupabaseRecord('timesheets', existingEntries[0].id.toString(), {
+          hours_worked: entry.hours,
+          description: entry.note,
+          user_id: user.id,
+        });
       } else {
         // Insert new entry
-        const { error } = await supabase
-          .from('timesheets')
-          .insert({
-            user_id: user?.id,
-            date: date,
-            hours_worked: entry.hours,
-            description: entry.note,
-            status: 'draft'
-          });
-          
-        if (error) throw error;
+        await insertSupabaseRecord('timesheets', {
+          user_id: user.id,
+          date: date,
+          hours_worked: entry.hours,
+          description: entry.note,
+          status: 'draft'
+        });
       }
       
       toast({
@@ -154,51 +167,6 @@ const Timesheets = () => {
         description: "Could not save your entry. Please try again.",
         variant: "destructive"
       });
-      
-      // Revert the local update if it failed
-      fetchEntries();
-    }
-  };
-
-  // Function to fetch entries - called after submit or when entry update fails
-  const fetchEntries = async () => {
-    if (!user) return;
-    
-    setIsLoading(true);
-    
-    const year = currentDate.getFullYear();
-    const month = currentDate.getMonth() + 1;
-    const firstDay = `${year}-${month.toString().padStart(2, '0')}-01`;
-    const lastDay = `${year}-${month.toString().padStart(2, '0')}-${new Date(year, month, 0).getDate().toString().padStart(2, '0')}`;
-    
-    try {
-      const { data, error } = await supabase
-        .from('timesheets')
-        .select('*')
-        .eq('user_id', user.id)
-        .gte('date', firstDay)
-        .lte('date', lastDay);
-        
-      if (error) throw error;
-      
-      const entriesMap = { ...entries };
-      
-      if (data) {
-        data.forEach((entry) => {
-          const type = entry.hours_worked === 0 ? "leave" : "work";
-          entriesMap[entry.date] = { 
-            hours: entry.hours_worked, 
-            type: type,
-            note: entry.description
-          };
-        });
-      }
-      
-      setEntries(entriesMap);
-    } catch (error) {
-      console.error('Error fetching timesheet entries:', error);
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -260,6 +228,8 @@ const Timesheets = () => {
 
   // Submit timesheet for approval
   const handleSubmit = async () => {
+    if (!user) return;
+    
     try {
       // Update all entries to "submitted" status
       const month = currentDate.getMonth() + 1;
@@ -268,7 +238,7 @@ const Timesheets = () => {
       const { error } = await supabase
         .from('timesheets')
         .update({ status: 'Pending' })
-        .eq('user_id', user?.id)
+        .eq('user_id', user.id)
         .gte('date', `${year}-${month.toString().padStart(2, '0')}-01`)
         .lte('date', `${year}-${month.toString().padStart(2, '0')}-31`);
         
@@ -295,6 +265,12 @@ const Timesheets = () => {
   const workDays = Object.values(entries).filter(entry => entry.hours > 0 && entry.type === "work").length;
   const leaveDays = Object.values(entries).filter(entry => entry.type === "leave").length;
 
+  // For debugging
+  useEffect(() => {
+    console.log("Current entries:", entries);
+    console.log("Total calculated hours:", totalHours);
+  }, [entries]);
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -305,7 +281,7 @@ const Timesheets = () => {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <LeaveRequest onRequestSubmitted={fetchEntries} />
+          <LeaveRequest onRequestSubmitted={() => {}} />
           <Button variant="outline" onClick={handleSaveDraft}>
             <Save className="mr-2 h-4 w-4" />
             Save Draft
